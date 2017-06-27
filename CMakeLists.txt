@@ -76,6 +76,7 @@ add_subdirectory(examples/ble_scan)
 add_subdirectory(examples/discover)
 add_subdirectory(examples/read_write)
 add_subdirectory(examples/notification)
+add_subdirectory(examples/gatttool537)
 add_subdirectory(examples/nordic_uart)
 
 # Some examples require Bluez code and other DBus support
