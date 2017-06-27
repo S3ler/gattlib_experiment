@@ -68,8 +68,35 @@ static void cmd_help(int argcp, char **argvp);
 
 static enum state {
 	STATE_DISCONNECTED,
+
 	STATE_CONNECTING,
-	STATE_CONNECTED
+	STATE_CONNECTED,
+
+	STATE_SERVICE_CHECKING,
+	STATE_SERVICE_READY,
+
+	STATE_CHARACTERISTICS_CHECKING,
+	STATE_CHARACTERISTICS_READY,
+
+	STATE_HANDLE_CHECKING,
+	STATE_HANDLE_READY,
+
+    STATE_TX_VALUE_SAVING,
+    STATE_TX_VALUE_SAVED,
+
+    STATE_RX_VALUE_CLEARING,
+    STATE_RX_VALUE_CLEARED,
+
+    STATE_TX_VALUE_NOTIFYING,
+    STATE_TX_VALUE_NOTIFIED,
+
+    STATE_MQTTSN_READY,
+
+    STATE_RX_WRITE_REQ,
+    STATE_RX_WRITING,
+    STATE_RX_WRITTEN,
+
+    STATE_EXITED
 } conn_state;
 
 
@@ -824,9 +851,88 @@ static void cmd_help(int argcp, char **argvp)
 
 static void parse_line(char *line_read)
 {
+
 	char **argvp;
 	int argcp;
 	int i;
+
+    if(conn_state == STATE_DISCONNECTED){
+        cmd_connect(argcp, argvp);
+        return;
+    }else if(conn_state == STATE_CONNECTING){
+        // wait
+        return;
+    }else if(conn_state == STATE_CONNECTED){
+        cmd_primary(argcp, argvp);
+        return;
+    }else if(conn_state == STATE_SERVICE_CHECKING){
+        // wait
+        return;
+    }else if(conn_state == STATE_SERVICE_READY){
+        cmd_char_desc(argcp, argvp);
+        return;
+    }else if(conn_state == STATE_CHARACTERISTICS_CHECKING){
+        // wait
+        return;
+    }else if(conn_state == STATE_CHARACTERISTICS_READY){
+        // find out TX_HND
+        // fint out TX_NOTIFY_HND
+        // find out RX_HND
+        cmd_char_desc(argcp, argvp);
+        return;
+    }else if(conn_state == STATE_HANDLE_CHECKING){
+        // wait
+        return;
+    }else if(conn_state == STATE_HANDLE_READY){
+        // TX_HND to hexadecimeal string
+        // "char-read-hnd 0xTX_HDN"
+        // save current TX_HND value in a buffer
+        // FIXME adept argcp, argvp
+        cmd_read_hnd(argcp, argvp);
+        return;
+    } else if (conn_state == STATE_TX_VALUE_SAVING) {
+        // wait
+        return;
+    } else if (conn_state == STATE_TX_VALUE_SAVED) {
+        // RX_HDN to hexadecimeal string
+        // 00 to string
+        // "char-write_req 0xRX_HDN 00"
+        // resets sendbuffer
+        // FIXME adept argcp, argvp
+        cmd_char_write(argcp, argvp);
+        return;
+    } else if (conn_state == STATE_RX_VALUE_CLEARING) {
+        // wait
+        return;
+    } else if (conn_state == STATE_RX_VALUE_CLEARED) {
+        // TX_NOTIFY_HDN to hexadecimeal string
+        // 0100 to string
+        // "char-read-hnd 0xTX_NOTIFY_HDN 0100"
+        // FIXME adept argcp, argvp
+        cmd_char_write(argcp, argvp);
+        return;
+    } else if (conn_state == STATE_TX_VALUE_NOTIFYING) {
+        // wait
+        return;
+    } else if (conn_state == STATE_TX_VALUE_NOTIFIED) {
+        conn_state = STATE_MQTTSN_READY;
+        return;
+    } else if (conn_state == STATE_MQTTSN_READY) {
+        // nothing to do
+        return;
+    } else if (conn_state == STATE_RX_WRITE_REQ) {
+        // "char-write_req 0xRX_HDN 05 04 03 02 01 00"
+        // FIXME adept argcp, argvp
+        cmd_char_write(argcp, argvp);
+        return;
+    } else if(conn_state == STATE_RX_WRITING){
+        // wait
+        return;
+    } else if (conn_state == STATE_RX_WRITTEN) {
+        conn_state = STATE_MQTTSN_READY;
+        return;
+    }
+
 
 	if (line_read == NULL) {
 		printf("\n");
@@ -992,7 +1098,7 @@ static guint setup_signalfd(void)
 	return source;
 }
 
-int interactive(const char *src, const char *dst,
+int  interactive(const char *src, const char *dst,
 		const char *dst_type, int psm)
 {
 	guint input;
