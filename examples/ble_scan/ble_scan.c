@@ -13,15 +13,15 @@ typedef void (*ble_discovered_device_t)(const char* addr, const char* name);
 // We use a mutex to make the BLE connections synchronous
 static pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-LIST_HEAD(listhead, connection_t) g_ble_connections;
-struct connection_t {
+LIST_HEAD(listhead, connection_t) g_ble_macs;
+struct ble_mac_t {
 	pthread_t thread;
 	char* addr;
 	LIST_ENTRY(connection_t) entries;
 };
 
 static void *ble_connect_device(void *arg) {
-	struct connection_t *connection = arg;
+	struct ble_mac_t *connection = arg;
 	char* addr = connection->addr;
 	gatt_connection_t* gatt_connection;
 	gattlib_primary_service_t* services;
@@ -86,7 +86,7 @@ connection_exit:
 }
 
 static void ble_discovered_device(const char* addr, const char* name) {
-	struct connection_t *connection;
+	struct ble_mac_t *connection;
 	int ret;
 
 	if (name) {
@@ -95,7 +95,7 @@ static void ble_discovered_device(const char* addr, const char* name) {
 		printf("Discovered %s\n", addr);
 	}
 
-	connection = malloc(sizeof(struct connection_t));
+	connection = malloc(sizeof(struct ble_mac_t));
 	if (connection == NULL) {
 		fprintf(stderr, "Failt to allocate connection.\n");
 		return;
@@ -108,7 +108,7 @@ static void ble_discovered_device(const char* addr, const char* name) {
 		free(connection);
 		return;
 	}
-	LIST_INSERT_HEAD(&g_ble_connections, connection, entries);
+	LIST_INSERT_HEAD(&g_ble_macs, connection, entries);
 }
 
 int main(int argc, const char *argv[]) {
@@ -125,7 +125,7 @@ int main(int argc, const char *argv[]) {
 		return 1;
 	}
 
-	LIST_INIT(&g_ble_connections);
+	LIST_INIT(&g_ble_macs);
 
 	ret = gattlib_adapter_open(adapter_name, &adapter);
 	if (ret) {
@@ -146,10 +146,10 @@ int main(int argc, const char *argv[]) {
 	pthread_mutex_unlock(&g_mutex);
 
 	// Wait for the thread to complete
-	while (g_ble_connections.lh_first != NULL) {
-		struct connection_t* connection = g_ble_connections.lh_first;
+	while (g_ble_macs.lh_first != NULL) {
+		struct ble_mac_t* connection = g_ble_macs.lh_first;
 		pthread_join(connection->thread, NULL);
-		LIST_REMOVE(g_ble_connections.lh_first, entries);
+		LIST_REMOVE(g_ble_macs.lh_first, entries);
 		free(connection->addr);
 		free(connection);
 	}

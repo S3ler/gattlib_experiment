@@ -1,0 +1,2 @@
+#!/bin/bash
+sudo gdbserver --once localhost:8889 ./../../cmake-build-debug/examples/hcitool/hcitool537

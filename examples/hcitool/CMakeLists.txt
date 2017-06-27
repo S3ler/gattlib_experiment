@@ -48,7 +48,7 @@ else()
   include_directories(${bluez5_DIR} ${bluez5_DIR}/attrib ${bluez5_DIR}/btio ${bluez5_DIR}/lib)
 endif()
 
-set(gatttool_SRCS display.h gatttool.c interactive.c utils.c )
+set(gatttool_SRCS hcitool.c oui.h oui.c )
 
-add_executable(gatttool537 ${gatttool_SRCS})
-target_link_libraries(gatttool537 ${GATTLIB_LIBRARIES} ${GLIB_LIBRARIES} readline pthread)
+add_executable(hcitool537 ${gatttool_SRCS})
+target_link_libraries(hcitool537 ${GATTLIB_LIBRARIES} ${GLIB_LIBRARIES})
