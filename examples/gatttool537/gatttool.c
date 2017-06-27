@@ -51,6 +51,7 @@
 #include "gatt.h"
 #include "gatttool.h"
 
+
 static char *opt_src = NULL;
 static char *opt_dst = NULL;
 static char *opt_dst_type = NULL;
@@ -511,75 +512,7 @@ static GOptionEntry options[] = {
         {NULL},
 };
 
-// We use a mutex to make the BLE connections synchronous
-static volatile bool le_scan_finished = false;
-LIST_HEAD(listhead, ble_mac_t) g_ble_macs;
 
-struct ble_mac_t {
-    char *addr;
-    LIST_ENTRY(ble_mac_t) entries;
-};
-
-static void ble_discovered_device(const char *addr, const char *name) {
-
-    if (name) {
-        printf("Discovered %s - '%s'\n", addr, name);
-    } else {
-        printf("Discovered %s\n", addr);
-    }
-
-    // check if connection already in list
-    bool not_in_list = true;
-    struct ble_mac_t *np;
-    for (np = g_ble_macs.lh_first; np != NULL; np = np->entries.le_next) {
-        if (strcmp(np->addr, addr) == 0) {
-            not_in_list = false;
-            break;
-        }
-    }
-
-    if (not_in_list) {
-        struct ble_mac_t *connection;
-
-        connection = malloc(sizeof(struct ble_mac_t));
-        if (connection == NULL) {
-            fprintf(stderr, "Failt to allocate connection.\n");
-            return;
-        }
-
-        connection->addr = strdup(addr);
-
-        LIST_INSERT_HEAD(&g_ble_macs, connection, entries);
-    }
-}
-
-
-void *le_scan(void *duration) {
-    const char *adapter_name = NULL;
-    void *adapter;
-    int ret;
-
-    LIST_INIT(&g_ble_macs);
-
-
-    ret = gattlib_adapter_open(adapter_name, &adapter);
-    if (ret) {
-        fprintf(stderr, "ERROR: Failed to open adapter.\n");
-    }
-    int dur = *(int *) duration;
-    ret = gattlib_adapter_scan_enable(adapter, ble_discovered_device, dur);
-    if (ret) {
-        fprintf(stderr, "ERROR: Failed to scan.\n");
-    }
-
-    gattlib_adapter_scan_disable(adapter);
-    puts("Scan completed");
-    le_scan_finished = true;
-
-    gattlib_adapter_close(adapter);
-    return NULL;
-}
-/* lescan */
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
@@ -601,6 +534,16 @@ void *le_scan(void *duration) {
 #define EIR_NAME_COMPLETE           0x09  /* complete local name */
 #define EIR_TX_POWER                0x0A  /* transmit power level */
 #define EIR_DEVICE_ID               0x10  /* device ID */
+
+
+LIST_HEAD(listhead, ble_mac_t) g_ble_macs;
+
+struct ble_mac_t {
+    char *addr;
+    LIST_ENTRY(ble_mac_t) entries;
+};
+
+
 
 
 #define for_each_opt(opt, long, short) while ((opt=getopt_long(argc, argv, short ? short:"+", long, NULL)) != -1)
@@ -785,10 +728,34 @@ static int print_advertising_devices(int dd, uint8_t filter_type)
             eir_parse_name(info->data, info->length,
                            name, sizeof(name) - 1);
 
-            printf("%s %s\n", addr, name);
+            // HERE
+            printf("Discovered: %s %s\n", addr, name);
+            // check if connection already in list
+            bool not_in_list = true;
+            struct ble_mac_t *np;
+            for (np = g_ble_macs.lh_first; np != NULL; np = np->entries.le_next) {
+                if (strcmp(np->addr, addr) == 0) {
+                    not_in_list = false;
+                    break;
+                }
+            }
+
+            if (not_in_list) {
+                struct ble_mac_t *connection;
+
+                connection = malloc(sizeof(struct ble_mac_t));
+                if (connection == NULL) {
+                    fprintf(stderr, "Failt to allocate connection.\n");
+                    //return;
+                }
+
+                connection->addr = strdup(addr);
+
+                LIST_INSERT_HEAD(&g_ble_macs, connection, entries);
+            }
         }
         if (time(NULL) > start + 10) {
-            printf("10s timeout!\n");
+            // finished scan
             break;
         }
     }
@@ -838,86 +805,86 @@ static void helper_arg(int min_num_arg, int max_num_arg, int *argc,
 
 static void cmd_lescan(int dev_id, int argc, char **argv)
 {
-	int err, opt, dd;
-	uint8_t own_type = LE_PUBLIC_ADDRESS;
-	uint8_t scan_type = 0x01;
-	uint8_t filter_type = 0;
-	uint8_t filter_policy = 0x00;
-	uint16_t interval = htobs(0x0010);
-	uint16_t window = htobs(0x0010);
-	uint8_t filter_dup = 0x01;
+    int err, opt, dd;
+    uint8_t own_type = LE_PUBLIC_ADDRESS;
+    uint8_t scan_type = 0x01;
+    uint8_t filter_type = 0;
+    uint8_t filter_policy = 0x00;
+    uint16_t interval = htobs(0x0010);
+    uint16_t window = htobs(0x0010);
+    uint8_t filter_dup = 0x01;
 
-	for_each_opt(opt, lescan_options, NULL) {
-		switch (opt) {
-			case 's':
-				own_type = LE_RANDOM_ADDRESS;
-				break;
-			case 'p':
-				own_type = LE_RANDOM_ADDRESS;
-				break;
-			case 'P':
-				scan_type = 0x00;
-				break;
-			case 'w':
-				filter_policy = 0x01;
-				break;
-			case 'd':
-				filter_type = optarg[0];
-				if (filter_type != 'g' && filter_type != 'l') {
-					fprintf(stderr, "Unknown discovery procedure\n");
-					exit(1);
-				}
+    for_each_opt(opt, lescan_options, NULL) {
+        switch (opt) {
+            case 's':
+                own_type = LE_RANDOM_ADDRESS;
+                break;
+            case 'p':
+                own_type = LE_RANDOM_ADDRESS;
+                break;
+            case 'P':
+                scan_type = 0x00;
+                break;
+            case 'w':
+                filter_policy = 0x01;
+                break;
+            case 'd':
+                filter_type = optarg[0];
+                if (filter_type != 'g' && filter_type != 'l') {
+                    fprintf(stderr, "Unknown discovery procedure\n");
+                    exit(1);
+                }
 
-				interval = htobs(0x0012);
-				window = htobs(0x0012);
-				break;
-			case 'D':
-				filter_dup = 0x00;
-				break;
-			default:
-				printf("%s", lescan_help);
-				return;
-		}
-	}
-	helper_arg(0, 1, &argc, &argv, lescan_help);
+                interval = htobs(0x0012);
+                window = htobs(0x0012);
+                break;
+            case 'D':
+                filter_dup = 0x00;
+                break;
+            default:
+                printf("%s", lescan_help);
+                return;
+        }
+    }
+    helper_arg(0, 1, &argc, &argv, lescan_help);
 
-	if (dev_id < 0)
-		dev_id = hci_get_route(NULL);
+    if (dev_id < 0)
+        dev_id = hci_get_route(NULL);
 
-	dd = hci_open_dev(dev_id);
-	if (dd < 0) {
-		perror("Could not open device");
-		exit(1);
-	}
+    dd = hci_open_dev(dev_id);
+    if (dd < 0) {
+        perror("Could not open device");
+        exit(1);
+    }
 
-	err = hci_le_set_scan_parameters(dd, scan_type, interval, window,
-									 own_type, filter_policy, 10000);
-	if (err < 0) {
-		perror("Set scan parameters failed");
-		exit(1);
-	}
+    err = hci_le_set_scan_parameters(dd, scan_type, interval, window,
+                                     own_type, filter_policy, 10000);
+    if (err < 0) {
+        perror("Set scan parameters failed");
+        exit(1);
+    }
 
-	err = hci_le_set_scan_enable(dd, 0x01, filter_dup, 10000);
-	if (err < 0) {
-		perror("Enable scan failed");
-		exit(1);
-	}
+    err = hci_le_set_scan_enable(dd, 0x01, filter_dup, 10000);
+    if (err < 0) {
+        perror("Enable scan failed");
+        exit(1);
+    }
 
-	printf("LE Scan ...\n");
+    printf("LE Scan ...\n");
 
-	err = print_advertising_devices(dd, filter_type);
-	if (err < 0) {
-		perror("Could not receive advertising events");
-		exit(1);
-	}
+    err = print_advertising_devices(dd, filter_type);
+    if (err < 0) {
+        perror("Could not receive advertising events");
+        exit(1);
+    }
 
-	err = hci_le_set_scan_enable(dd, 0x00, filter_dup, 10000);
-	if (err < 0) {
-		perror("Disable scan failed");
-		exit(1);
-	}
+    err = hci_le_set_scan_enable(dd, 0x00, filter_dup, 10000);
+    if (err < 0) {
+        perror("Disable scan failed");
+        exit(1);
+    }
 
-	hci_close_dev(dd);
+    hci_close_dev(dd);
 }
 
 struct lescan_arg_struct {
@@ -927,8 +894,11 @@ struct lescan_arg_struct {
 } lescan_arg_struct_t;
 
 static void* call_cmd_lescan(void *arg_struct) {
+    LIST_INIT(&g_ble_macs);
+
     struct lescan_arg_struct *arg = (struct lescan_arg_struct *)arg_struct;
     cmd_lescan(arg->dev_id, arg->argc, arg->argv);
+    puts("Scan completed");
     return NULL;
 }
 
@@ -948,7 +918,7 @@ int main(int argc, char *argv[]) {
     pthread_create(&le_scan_thread, NULL, call_cmd_lescan, &lescan_arg);
     pthread_join(le_scan_thread, NULL);
 
-    const char *default_mac = "00:1A:7D:DA:71:12";
+    const char *default_mac = "00:1A:7D:DA:71:11";
     bool not_in_list = true;
     struct ble_mac_t *np;
     for (np = g_ble_macs.lh_first; np != NULL; np = np->entries.le_next) {
@@ -962,6 +932,7 @@ int main(int argc, char *argv[]) {
         got_error = TRUE;
         goto done;
     }
+    g_print("Remote Bluetooth address found during scanning\n");
 
     opt_dst = g_strdup(default_mac);
     opt_dst_type = g_strdup("public");
