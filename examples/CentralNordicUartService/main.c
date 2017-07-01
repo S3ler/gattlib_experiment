@@ -46,8 +46,8 @@
 #include "gatt.h"
 #include "src/shared/util.h"
 
-int scan_duration = 10;
-const char *peripheral_mac = "00:1A:7D:DA:71:11";
+int scan_duration = 2;
+const char *peripheral_mac = "00:1A:7D:DA:71:12";
 
 
 #define TX_CHRC_UUID "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
@@ -551,31 +551,22 @@ static void cmd_init_mqttsn() {
 }
 
 static void cmd_write_tx_notify_hnd() {
-    uint8_t *value;
-    size_t plen;
-    int handle;
 
     if (conn_state != STATE_TX_VALUE_SAVED) {
         printf("Command Failed: Not STATE_TX_VALUE_SAVED\n");
         return;
     }
 
-    handle = nus_rx_notify_handle;
+    uint16_t handle = nus_rx_notify_handle;
     if (handle <= 0) {
         printf("Command Failed: A valid handle is required\n");
         return;
     }
 
-    const char notify_value[] = "0100"; // FIXME
-    plen = gatt_attr_data_from_string((const char *) notify_value, &value);
-    if (plen == 0) {
-        printf("Command Failed: Invalid value\n");
-        return;
-    }
+    uint8_t value[] = {1, 0};
+    int plen = 2;
 
     gatt_write_cmd(attrib, handle, value, plen, NULL, NULL);
-
-    g_free(value);
 
     conn_state = STATE_TX_VALUE_NOTIFIED;
     cmd_init_mqttsn();
@@ -971,6 +962,7 @@ int main(int argc, char *argv[]) {
     struct listhead scan_result = cmd_lescan(scan_duration);
     if (!ble_mac_found(peripheral_mac, &scan_result)) {
         g_print("Remote Bluetooth address not found\n");
+        goto done;
     }
     g_print("Remote Bluetooth address found during scanning\n");
 
@@ -986,6 +978,7 @@ int main(int argc, char *argv[]) {
 
     g_main_loop_run(event_loop);
 
+    done:
     rl_callback_handler_remove();
     disconnect_io();
     g_source_remove(prompt_input);
