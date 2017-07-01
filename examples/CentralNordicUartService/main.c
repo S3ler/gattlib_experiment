@@ -35,6 +35,7 @@
 #include <sys/queue.h>
 
 #include <readline/readline.h>
+#include <sys/signalfd.h>
 
 #include "lib/hci_lib.h"
 #include "lib/uuid.h"
@@ -64,7 +65,10 @@ LIST_HEAD(listhead, ble_mac_t) g_ble_macs;
 static GIOChannel *iochannel = NULL;
 static GAttrib *attrib = NULL;
 static GMainLoop *event_loop;
-static char *prompt = ">";
+
+static guint prompt_input;
+static guint prompt_signal;
+static char *prompt = "> ";
 
 
 static char *opt_dst = NULL;
@@ -380,13 +384,20 @@ static struct listhead cmd_lescan(int scan_duration) {
     return g_ble_macs;
 }
 
-static bool ble_mac_found(const char *ble_mac, struct listhead g_ble_macs) {
-    for (struct ble_mac_t *np = g_ble_macs.lh_first; np != NULL; np = np->entries.le_next) {
+static bool ble_mac_found(const char *ble_mac, struct listhead *g_ble_macs) {
+    for (struct ble_mac_t *np = LIST_FIRST(g_ble_macs); np != NULL; np = LIST_NEXT(np, entries)) {
         if (strcmp(np->addr, ble_mac) == 0) {
             return true;
         }
     }
     return false;
+}
+
+static void free_ble_mac_list(struct listhead *g_ble_macs) {
+    for (struct ble_mac_t *np = LIST_FIRST(g_ble_macs); np != NULL; np = LIST_NEXT(np, entries)) {
+        LIST_REMOVE(np, entries);
+        free(np);
+    }
 }
 
 /* End of Bluetooth Low Energy Scan */
@@ -839,20 +850,129 @@ static void parse_line(char *line_read) {
     free(line_read);
 }
 
+static gboolean prompt_read(GIOChannel *chan, GIOCondition cond,
+                            gpointer user_data) {
+    if (cond & (G_IO_HUP | G_IO_ERR | G_IO_NVAL)) {
+        g_io_channel_unref(chan);
+        return FALSE;
+    }
+
+    rl_callback_read_char();
+
+    return TRUE;
+}
+
+static guint setup_standard_input(void) {
+    GIOChannel *channel;
+    guint source;
+
+    channel = g_io_channel_unix_new(fileno(stdin));
+
+    source = g_io_add_watch(channel,
+                            G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
+                            prompt_read, NULL);
+
+    g_io_channel_unref(channel);
+
+    return source;
+}
+
+
+static gboolean signal_handler(GIOChannel *channel, GIOCondition condition,
+                               gpointer user_data) {
+    static unsigned int __terminated = 0;
+    struct signalfd_siginfo si;
+    ssize_t result;
+    int fd;
+
+    if (condition & (G_IO_NVAL | G_IO_ERR | G_IO_HUP)) {
+        g_main_loop_quit(event_loop);
+        return FALSE;
+    }
+
+    fd = g_io_channel_unix_get_fd(channel);
+
+    result = read(fd, &si, sizeof(si));
+    if (result != sizeof(si))
+        return FALSE;
+
+    switch (si.ssi_signo) {
+        case SIGINT:
+            rl_replace_line("", 0);
+            rl_crlf();
+            rl_on_new_line();
+            rl_redisplay();
+            break;
+        case SIGTERM:
+            if (__terminated == 0) {
+                rl_replace_line("", 0);
+                rl_crlf();
+                g_main_loop_quit(event_loop);
+            }
+
+            __terminated = 1;
+            break;
+    }
+
+    return TRUE;
+}
+
+static guint setup_signalfd(void) {
+    GIOChannel *channel;
+    guint source;
+    sigset_t mask;
+    int fd;
+
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGINT);
+    sigaddset(&mask, SIGTERM);
+
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0) {
+        perror("Failed to set signal mask");
+        return 0;
+    }
+
+    fd = signalfd(-1, &mask, 0);
+    if (fd < 0) {
+        perror("Failed to create signal descriptor");
+        return 0;
+    }
+
+    channel = g_io_channel_unix_new(fd);
+
+    g_io_channel_set_close_on_unref(channel, TRUE);
+    g_io_channel_set_encoding(channel, NULL, NULL);
+    g_io_channel_set_buffered(channel, FALSE);
+
+    source = g_io_add_watch(channel,
+                            G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
+                            signal_handler, NULL);
+
+    g_io_channel_unref(channel);
+
+    return source;
+}
+
 
 static char *get_prompt(void) {
     return prompt;
 }
 
+static void init_readline() {
+    prompt_input = setup_standard_input(); // input
+    prompt_signal = setup_signalfd(); // signal
+    rl_erase_empty_line = 1;
+    rl_callback_handler_install(get_prompt(), parse_line);
+}
+
+
 int main(int argc, char *argv[]) {
-    // GError *gerr = NULL;
-    // GIOChannel *chan;
 
     struct listhead scan_result = cmd_lescan(scan_duration);
-    if (ble_mac_found(peripheral_mac, scan_result)) {
-        g_print("Remote Bluetooth address found during scanning\n");
+    if (!ble_mac_found(peripheral_mac, &scan_result)) {
+        g_print("Remote Bluetooth address not found\n");
     }
-
+    g_print("Remote Bluetooth address found during scanning\n");
 
     opt_sec_level = g_strdup("low");
     opt_src = NULL;
@@ -860,25 +980,23 @@ int main(int argc, char *argv[]) {
     opt_dst_type = g_strdup("public");
     opt_psm = 0;
 
-    // init prompt
     event_loop = g_main_loop_new(NULL, FALSE);
-
-    rl_erase_empty_line = 0;
-    rl_callback_handler_install(get_prompt(), parse_line);
-
     cmd_connect(peripheral_mac);
+    init_readline();
 
     g_main_loop_run(event_loop);
 
     rl_callback_handler_remove();
-    //cmd_disconnect(0, NULL);
-    // g_source_remove(input);
-    // g_source_remove(signal);
+    disconnect_io();
+    g_source_remove(prompt_input);
+    g_source_remove(prompt_signal);
     g_main_loop_unref(event_loop);
 
     g_free(opt_src);
     g_free(opt_dst);
     g_free(opt_sec_level);
+
+    free_ble_mac_list(&scan_result);
 
     return 0;
     //interactive(opt_src, opt_dst, opt_dst_type, opt_psm);
