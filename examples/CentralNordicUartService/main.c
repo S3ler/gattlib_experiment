@@ -1,5 +1,3 @@
-
-
 /*
  *
  *  GattLib - GATT Library
@@ -23,27 +21,86 @@
  *
  */
 
-#include <glib.h>
-#include <sys/queue.h>
-#include <stdint.h>
-#include <unistd.h>
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
-#include <bluetooth.h>
-#include <hci.h>
-#include <lib/hci_lib.h>
-#include <stdlib.h>
 #include <errno.h>
-#include <stdbool.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+
+#include <glib.h>
+#include <gattlib.h>
+#include <sys/queue.h>
+
+#include <readline/readline.h>
+
+#include "lib/hci_lib.h"
+#include "lib/uuid.h"
+
+#include "att.h"
+#include "btio/btio.h"
+#include "gattrib.h"
+#include "gatt.h"
+#include "src/shared/util.h"
 
 int scan_duration = 10;
 const char *peripheral_mac = "00:1A:7D:DA:71:11";
+
+
+#define TX_CHRC_UUID "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
+#define RX_CHRC_UUID "6e400002-b5a3-f393-e0a9-e50e24dcca9e"
+#define RX_CCCD_UUID "00002902-0000-1000-8000-00805f9b34fb"
+
+uint16_t nus_rx_notify_handle = 0;
+uint16_t nus_rx_handle = 0;
+uint16_t nus_tx_handle = 0;
+char tx_buffer[20] = {0};
+
 static volatile int signal_received = 0;
 LIST_HEAD(listhead, ble_mac_t) g_ble_macs;
 
+static GIOChannel *iochannel = NULL;
+static GAttrib *attrib = NULL;
+static GMainLoop *event_loop;
+static char *prompt = ">";
 
-#define FLAGS_AD_TYPE 0x01
-#define FLAGS_LIMITED_MODE_BIT 0x01
-#define FLAGS_GENERAL_MODE_BIT 0x02
+
+static char *opt_dst = NULL;
+static char *opt_src = NULL;
+static char *opt_dst_type = NULL;
+static char *opt_sec_level = NULL;
+static int opt_psm = 0;
+static int opt_mtu = 0;
+static int start;
+static int end;
+
+static enum state {
+    STATE_DISCONNECTED,
+
+    STATE_CONNECTING,
+    STATE_CONNECTED,
+
+    STATE_HANDLE_CHECKING,
+    STATE_HANDLE_READY,
+
+    STATE_TX_VALUE_SAVED,
+    STATE_RX_VALUE_CLEARING,
+
+    STATE_TX_VALUE_NOTIFIED,
+
+    STATE_MQTTSN_READY,
+
+    STATE_EXITED
+} conn_state;
+
+
+// lescan defines
+
+#define FLAGS_AD_TYPE               0x01
+#define FLAGS_LIMITED_MODE_BIT      0x01
+#define FLAGS_GENERAL_MODE_BIT      0x02
 #define EIR_FLAGS                   0x01  /* flags */
 #define EIR_UUID16_SOME             0x02  /* 16-bit UUID, more available */
 #define EIR_UUID16_ALL              0x03  /* 16-bit UUID, all listed */
@@ -325,11 +382,466 @@ static struct listhead cmd_lescan(int scan_duration) {
 
 static bool ble_mac_found(const char *ble_mac, struct listhead g_ble_macs) {
     for (struct ble_mac_t *np = g_ble_macs.lh_first; np != NULL; np = np->entries.le_next) {
-        if (strcmp(np->addr, peripheral_mac) == 0) {
+        if (strcmp(np->addr, ble_mac) == 0) {
             return true;
         }
     }
     return false;
+}
+
+/* End of Bluetooth Low Energy Scan */
+GIOChannel *gatt_connect(const char *src, const char *dst,
+                         const char *dst_type, const char *sec_level,
+                         int psm, int mtu, BtIOConnect connect_cb,
+                         GError **gerr) // ++ gpointer usercontext classe
+{
+    GIOChannel *chan;
+    bdaddr_t sba, dba;
+    uint8_t dest_type;
+    GError *tmp_err = NULL;
+    BtIOSecLevel sec;
+
+    str2ba(dst, &dba);
+
+    /* Local adapter */
+    if (src != NULL) {
+        if (!strncmp(src, "hci", 3))
+            hci_devba(atoi(src + 3), &sba);
+        else
+            str2ba(src, &sba);
+    } else
+        bacpy(&sba, BDADDR_ANY);
+
+    /* Not used for BR/EDR */
+    if (strcmp(dst_type, "random") == 0)
+        dest_type = BDADDR_LE_RANDOM;
+    else
+        dest_type = BDADDR_LE_PUBLIC;
+
+    if (strcmp(sec_level, "medium") == 0)
+        sec = BT_IO_SEC_MEDIUM;
+    else if (strcmp(sec_level, "high") == 0)
+        sec = BT_IO_SEC_HIGH;
+    else
+        sec = BT_IO_SEC_LOW;
+
+    if (psm == 0)
+        chan = bt_io_connect(connect_cb, NULL, NULL,
+                             &tmp_err, // ++ gpointer usercontext classe hier ersten NULL erstezen
+                             BT_IO_OPT_SOURCE_BDADDR, &sba,
+                             BT_IO_OPT_SOURCE_TYPE, BDADDR_LE_PUBLIC,
+                             BT_IO_OPT_DEST_BDADDR, &dba,
+                             BT_IO_OPT_DEST_TYPE, dest_type,
+                             BT_IO_OPT_CID, ATT_CID,
+                             BT_IO_OPT_SEC_LEVEL, sec,
+                             BT_IO_OPT_INVALID);
+    else
+        chan = bt_io_connect(connect_cb, NULL, NULL, &tmp_err,
+                             BT_IO_OPT_SOURCE_BDADDR, &sba,
+                             BT_IO_OPT_DEST_BDADDR, &dba,
+                             BT_IO_OPT_PSM, psm,
+                             BT_IO_OPT_IMTU, mtu,
+                             BT_IO_OPT_SEC_LEVEL, sec,
+                             BT_IO_OPT_INVALID);
+
+    if (tmp_err) {
+        g_propagate_error(gerr, tmp_err);
+        return NULL;
+    }
+
+    return chan;
+}
+
+
+size_t gatt_attr_data_from_string(const char *str, uint8_t **data) {
+    // TODO remove me!
+    char tmp[3];
+    size_t size, i;
+
+    size = strlen(str) / 2;
+    *data = g_try_malloc0(size);
+    if (*data == NULL)
+        return 0;
+
+    tmp[2] = '\0';
+    for (i = 0; i < size; i++) {
+        memcpy(tmp, str + (i * 2), 2);
+        (*data)[i] = (uint8_t) strtol(tmp, NULL, 16);
+    }
+
+    return size;
+}
+
+
+static void events_handler(const uint8_t *pdu, uint16_t len, gpointer user_data) {
+    uint8_t *opdu;
+    uint16_t handle, i, olen;
+    size_t plen;
+    GString *s;
+
+    handle = get_le16(&pdu[1]);
+
+    switch (pdu[0]) {
+        case ATT_OP_HANDLE_NOTIFY:
+            s = g_string_new(NULL);
+            g_string_printf(s, "Notification handle = 0x%04x value: ",
+                            handle);
+            if (handle == nus_rx_notify_handle) {
+                printf("nus_rx_notify_handle");
+            } else if (handle == nus_rx_handle) {
+                printf("nus_rx_handle");
+            }
+            // HERE: notify handle
+            break;
+        case ATT_OP_HANDLE_IND:
+            s = g_string_new(NULL);
+            g_string_printf(s, "Indication   handle = 0x%04x value: ",
+                            handle);
+            break;
+        default:
+            printf("Command Failed: Invalid opcode\n");
+            return;
+    }
+
+    for (i = 3; i < len; i++)
+        g_string_append_printf(s, "%02x ", pdu[i]);
+
+    printf("%s\n", s->str);
+    g_string_free(s, TRUE);
+
+    if (pdu[0] == ATT_OP_HANDLE_NOTIFY)
+        return;
+
+    opdu = g_attrib_get_buffer(attrib, &plen);
+    olen = enc_confirmation(opdu, plen);
+
+    if (olen > 0)
+        g_attrib_send(attrib, 0, opdu, olen, NULL, NULL, NULL);
+}
+
+static void disconnect_io() {
+    if (conn_state == STATE_DISCONNECTED)
+        return;
+
+    g_attrib_unref(attrib);
+    attrib = NULL;
+    opt_mtu = 0;
+
+    g_io_channel_shutdown(iochannel, FALSE, NULL);
+    g_io_channel_unref(iochannel);
+    iochannel = NULL;
+
+    conn_state = STATE_DISCONNECTED;
+}
+
+static void cmd_init_mqttsn() {
+    conn_state = STATE_MQTTSN_READY;
+    printf("\n\n Finally -- NUS Ready \n");
+}
+
+static void cmd_write_tx_notify_hnd() {
+    uint8_t *value;
+    size_t plen;
+    int handle;
+
+    if (conn_state != STATE_TX_VALUE_SAVED) {
+        printf("Command Failed: Not STATE_TX_VALUE_SAVED\n");
+        return;
+    }
+
+    handle = nus_rx_notify_handle;
+    if (handle <= 0) {
+        printf("Command Failed: A valid handle is required\n");
+        return;
+    }
+
+    const char notify_value[] = "0100"; // FIXME
+    plen = gatt_attr_data_from_string((const char *) notify_value, &value);
+    if (plen == 0) {
+        printf("Command Failed: Invalid value\n");
+        return;
+    }
+
+    gatt_write_cmd(attrib, handle, value, plen, NULL, NULL);
+
+    g_free(value);
+
+    conn_state = STATE_TX_VALUE_NOTIFIED;
+    cmd_init_mqttsn();
+}
+
+
+static void cmd_read_tx_buffer_cb(guint8 status, const guint8 *pdu, guint16 plen,
+                                  gpointer user_data) {
+    uint8_t value[plen];
+    ssize_t vlen;
+    int i;
+    GString *s;
+
+    /*
+    if (conn_state != STATE_RX_VALUE_CLEARING) {
+        printf("Command Failed: Not STATE_RX_VALUE_CLEARING\n");
+        return;
+    }
+    */
+
+    if (status != 0) {
+        printf("Command Failed: Characteristic value/descriptor read failed: %s\n",
+               att_ecode2str(status));
+        return;
+    }
+
+    vlen = dec_read_resp(pdu, plen, value, sizeof(value));
+    if (vlen < 0) {
+        printf("Command Failed: Protocol error\n");
+        return;
+    }
+
+    memset(tx_buffer, 0, sizeof(tx_buffer));
+    s = g_string_new("Characteristic value/descriptor: ");
+    for (i = 0; i < vlen; i++) {
+        g_string_append_printf(s, "%02x ", value[i]);
+        tx_buffer[i] = value[i];
+    }
+
+    printf("%s\n", s->str);
+
+    g_string_free(s, TRUE);
+
+    conn_state = STATE_TX_VALUE_SAVED;
+    cmd_write_tx_notify_hnd();
+}
+
+static void cmd_read_tx_buffer() {
+    if (conn_state != STATE_HANDLE_READY) {
+        printf("Command Failed: Not STATE_HANDLE_READY\n");
+        return;
+    }
+
+    conn_state = STATE_RX_VALUE_CLEARING;
+    gatt_read_char(attrib, nus_rx_handle, cmd_read_tx_buffer_cb, attrib);
+}
+
+static void check_characteristic_descriptors(uint8_t status, GSList *descriptors, void *user_data) {
+    GSList *l;
+
+    if (status) {
+        printf("Command Failed: Discover descriptors failed: %s\n",
+               att_ecode2str(status));
+        return;
+    }
+
+    if (conn_state != STATE_HANDLE_CHECKING) {
+        printf("Command Failed: Invalid State - must be STATE_HANDLE_CHECKING\n");
+        return;
+    }
+
+    bool done = false;
+    bool hnd_tx = FALSE;
+    bool hnd_rx = FALSE;
+    bool hnd_rx_cccd = FALSE;
+
+    for (l = descriptors; l; l = l->next) {
+        struct gatt_desc *desc = l->data;
+        printf("handle: 0x%04x, uuid: %s\n", desc->handle,
+               desc->uuid);
+        if (!done) {
+            if (strcmp(desc->uuid, TX_CHRC_UUID) == 0) {
+                if (!hnd_tx) {
+                    hnd_tx = TRUE;
+                    nus_tx_handle = desc->handle;
+                } else {
+                    printf("Command Failed: Discovered duplicate hnd_tx");
+                    return;
+                }
+            }
+            if (strcmp(desc->uuid, RX_CHRC_UUID) == 0) {
+                if (!hnd_rx) {
+                    hnd_rx = TRUE;
+                    nus_rx_handle = desc->handle;
+                } else {
+                    printf("Command Failed: Discovered duplicate hnd_rx");
+                    return;
+                }
+            }
+            if (!hnd_rx_cccd && hnd_rx && strcmp(desc->uuid, RX_CCCD_UUID) == 0) {
+                if (!hnd_rx_cccd) {
+                    hnd_rx_cccd = TRUE;
+                    nus_rx_notify_handle = desc->handle;
+                }
+            }
+            if (hnd_tx & hnd_rx & hnd_rx_cccd) {
+                done = true;
+            }
+        }
+    }
+    if (done) {
+        printf("Found all characteristics and CCCDs");
+        conn_state = STATE_HANDLE_READY;
+        cmd_read_tx_buffer();
+        // call next
+    } else {
+        printf("Command Failed: Did not discover necessary characteristics and CCCDs");
+    }
+}
+
+static void cmd_check_characteristic_descriptors() {
+    if (conn_state != STATE_CONNECTED) {
+        printf("Command Failed: Disconnected\n");
+        return;
+    }
+
+    start = 0x0001;
+    end = 0xffff;
+    conn_state = STATE_HANDLE_CHECKING;
+    gatt_discover_desc(attrib, start, end, NULL, check_characteristic_descriptors, NULL);
+}
+
+static void connect_cb(GIOChannel *io, GError *err, gpointer user_data) {
+    uint16_t mtu;
+    uint16_t cid;
+
+    if (err) {
+        conn_state = STATE_DISCONNECTED;
+        printf("Command Failed: %s\n", err->message);
+        return;
+    }
+
+    bt_io_get(io, &err, BT_IO_OPT_IMTU, &mtu,
+              BT_IO_OPT_CID, &cid, BT_IO_OPT_INVALID);
+
+    if (err) {
+        g_printerr("Can't detect MTU, using default: %s", err->message);
+        g_error_free(err);
+        mtu = ATT_DEFAULT_LE_MTU;
+    }
+
+    if (cid == ATT_CID)
+        mtu = ATT_DEFAULT_LE_MTU;
+
+    attrib = g_attrib_new(iochannel, mtu, false);
+    g_attrib_register(attrib, ATT_OP_HANDLE_NOTIFY, GATTRIB_ALL_HANDLES,
+                      events_handler, attrib, NULL);
+    g_attrib_register(attrib, ATT_OP_HANDLE_IND, GATTRIB_ALL_HANDLES,
+                      events_handler, attrib, NULL);
+    conn_state = STATE_CONNECTED;
+    printf("Connection successful\n");
+
+    cmd_check_characteristic_descriptors();
+}
+
+static gboolean channel_watcher(GIOChannel *chan, GIOCondition cond,
+                                gpointer user_data) {
+    disconnect_io();
+    return FALSE;
+}
+
+static void cmd_connect(const char *ble_peripheral_mac) {
+    GError *gerr = NULL;
+
+    if (conn_state != STATE_DISCONNECTED)
+        return;
+
+    /*
+    if (argcp > 1) {
+        g_free(opt_dst);
+        opt_dst = g_strdup(argvp[1]);
+
+        g_free(opt_dst_type);
+        if (argcp > 2)
+            opt_dst_type = g_strdup(argvp[2]);
+        else
+            opt_dst_type = g_strdup("public");
+    }
+    */
+    opt_dst_type = g_strdup("public");
+
+    if (opt_dst == NULL) {
+        printf("Command Failed: Remote Bluetooth address required\n");
+        return;
+    }
+
+    printf("Attempting to connect to %s\n", opt_dst);
+    conn_state = STATE_CONNECTING;
+    iochannel = gatt_connect(opt_src, opt_dst, opt_dst_type, opt_sec_level,
+                             opt_psm, opt_mtu, connect_cb, &gerr);
+    if (iochannel == NULL) {
+        conn_state = STATE_DISCONNECTED;
+        printf("Command Failed: %s\n", gerr->message);
+        g_error_free(gerr);
+    } else
+        g_io_add_watch(iochannel, G_IO_HUP, channel_watcher, NULL);
+}
+
+
+static void char_write_req_raw_cb(guint8 status, const guint8 *pdu, guint16 plen,
+                                  gpointer user_data) {
+    if (status != 0) {
+        printf("Command Failed: Characteristic Write Request failed: "
+                       "%s\n", att_ecode2str(status));
+        return;
+    }
+
+    if (!dec_write_resp(pdu, plen) && !dec_exec_write_resp(pdu, plen)) {
+        printf("Command Failed: Protocol error\n");
+        return;
+    }
+
+    printf("Characteristic value was written successfully\n");
+    conn_state = STATE_MQTTSN_READY;
+}
+
+static void cmd_char_write_raw(uint16_t length, uint8_t *data) {
+
+    if (length > 20) {
+        printf("Command Failed: Too much data %i\n", length);
+        return;
+    }
+
+    if (conn_state != STATE_MQTTSN_READY) {
+        printf("Command Failed: Not STATE_HANDLE_READY\n");
+        return;
+    }
+
+    gatt_write_char(attrib, nus_tx_handle, data, (size_t) length,
+                    char_write_req_raw_cb, NULL);
+
+}
+
+static void parse_line(char *line_read) {
+    char exit_command[] = "exit";
+    if (strcmp(line_read, exit_command) == 0) {
+        exit(0);
+    }
+
+    if (conn_state != STATE_MQTTSN_READY) {
+        printf("Not Connnected yet.\n");
+        goto done;
+    }
+
+    if (line_read == NULL) {
+        printf("\n");
+        // exit
+        rl_callback_handler_remove();
+        g_main_loop_quit(event_loop);
+        return;
+    }
+
+    if (strlen(line_read) > 20) {
+        printf("Message is longer then 20 bytes.\n");
+        goto done;
+    }
+
+    cmd_char_write_raw((uint16_t) strlen(line_read), (uint8_t *) line_read);
+    return;
+
+    done:
+    free(line_read);
+}
+
+
+static char *get_prompt(void) {
+    return prompt;
 }
 
 int main(int argc, char *argv[]) {
@@ -340,6 +852,35 @@ int main(int argc, char *argv[]) {
     if (ble_mac_found(peripheral_mac, scan_result)) {
         g_print("Remote Bluetooth address found during scanning\n");
     }
+
+
+    opt_sec_level = g_strdup("low");
+    opt_src = NULL;
+    opt_dst = g_strdup(peripheral_mac);
+    opt_dst_type = g_strdup("public");
+    opt_psm = 0;
+
+    // init prompt
+    event_loop = g_main_loop_new(NULL, FALSE);
+
+    rl_erase_empty_line = 0;
+    rl_callback_handler_install(get_prompt(), parse_line);
+
+    cmd_connect(peripheral_mac);
+
+    g_main_loop_run(event_loop);
+
+    rl_callback_handler_remove();
+    //cmd_disconnect(0, NULL);
+    // g_source_remove(input);
+    // g_source_remove(signal);
+    g_main_loop_unref(event_loop);
+
+    g_free(opt_src);
+    g_free(opt_dst);
+    g_free(opt_sec_level);
+
+    return 0;
     //interactive(opt_src, opt_dst, opt_dst_type, opt_psm);
     /*
     g_printerr("%s\n", gerr->message);
@@ -352,6 +893,5 @@ int main(int argc, char *argv[]) {
         exit(EXIT_SUCCESS);
     }
     */
-    exit(EXIT_SUCCESS);
 
 }
