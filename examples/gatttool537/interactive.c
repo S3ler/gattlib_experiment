@@ -77,6 +77,7 @@ static void cmd_init_mqttsn();
 static gboolean hnd_tx = FALSE;
 static gboolean hnd_rx = FALSE;
 static gboolean hnd_rx_cccd = FALSE;
+
 uint16_t nus_rx_notify_handle = 0;
 uint16_t nus_rx_handle = 0;
 uint16_t nus_tx_handle = 0;
@@ -1338,17 +1339,16 @@ int interactive(const char *src, const char *dst,
 
     opt_sec_level = g_strdup("low");
 
-    opt_src = g_strdup(src);
-    opt_dst = g_strdup(dst);
-    opt_dst_type = g_strdup(dst_type);
-    opt_psm = psm;
+    opt_src = g_strdup(src); // NULL
+    opt_dst = g_strdup(dst); // 00:1A:7D:DA:71:11"
+    opt_dst_type = g_strdup(dst_type); //public"
+    opt_psm = psm; // psm = 0
 
     prompt = g_string_new(NULL);
-
     event_loop = g_main_loop_new(NULL, FALSE);
 
-    input = setup_standard_input();
-    signal = setup_signalfd();
+    input = setup_standard_input(); // input
+    signal = setup_signalfd(); // signal
 
 
     rl_attempted_completion_function = commands_completion;
@@ -1361,6 +1361,7 @@ int interactive(const char *src, const char *dst,
     fake_argvp[0] = connect_command;
     fake_argvp[1] = connect_mac;
     cmd_connect(2, fake_argvp);
+
     g_main_loop_run(event_loop);
 
     rl_callback_handler_remove();
