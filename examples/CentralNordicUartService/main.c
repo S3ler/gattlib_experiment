@@ -1,7 +1,7 @@
 /*
  *
  *  GattLib - GATT Library
- *
+ *  Copyright (C) 2016  Olivier Martin <olivier@labapart.org>
  *  Copyright (C) 2017  S3ler
  *
  *
@@ -68,7 +68,7 @@ static GMainLoop *event_loop;
 
 static guint prompt_input;
 static guint prompt_signal;
-static char *prompt = "> ";
+static char *prompt = "";
 
 
 static char *opt_dst = NULL;
@@ -92,11 +92,11 @@ static enum state {
     STATE_TX_VALUE_SAVED,
     STATE_RX_VALUE_CLEARING,
 
-    STATE_TX_VALUE_NOTIFIED,
+    STATE_RX_NOTIFY_ENABLED,
 
-    STATE_MQTTSN_READY,
+    STATE_NUS_READY,
 
-    STATE_EXITED
+    STATE_ERROR
 } conn_state;
 
 
@@ -546,7 +546,7 @@ static void disconnect_io() {
 }
 
 static void cmd_init_mqttsn() {
-    conn_state = STATE_MQTTSN_READY;
+    conn_state = STATE_NUS_READY;
     printf("\n\n Finally -- NUS Ready \n");
 }
 
@@ -568,7 +568,7 @@ static void cmd_write_tx_notify_hnd() {
 
     gatt_write_cmd(attrib, handle, value, plen, NULL, NULL);
 
-    conn_state = STATE_TX_VALUE_NOTIFIED;
+    conn_state = STATE_RX_NOTIFY_ENABLED;
     cmd_init_mqttsn();
 }
 
@@ -790,7 +790,7 @@ static void char_write_req_raw_cb(guint8 status, const guint8 *pdu, guint16 plen
     }
 
     printf("Characteristic value was written successfully\n");
-    conn_state = STATE_MQTTSN_READY;
+    conn_state = STATE_NUS_READY;
 }
 
 static void cmd_char_write_raw(uint16_t length, uint8_t *data) {
@@ -800,7 +800,7 @@ static void cmd_char_write_raw(uint16_t length, uint8_t *data) {
         return;
     }
 
-    if (conn_state != STATE_MQTTSN_READY) {
+    if (conn_state != STATE_NUS_READY) {
         printf("Command Failed: Not STATE_HANDLE_READY\n");
         return;
     }
@@ -816,7 +816,7 @@ static void parse_line(char *line_read) {
         exit(0);
     }
 
-    if (conn_state != STATE_MQTTSN_READY) {
+    if (conn_state != STATE_NUS_READY) {
         printf("Not Connnected yet.\n");
         goto done;
     }

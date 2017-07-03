@@ -25,7 +25,7 @@ cmake_minimum_required(VERSION 2.6)
 # CROSS_COMPILE and SYSROOT are defined
 include(CrossCompilation.cmake)
 
-project(gattlib)
+project(gattlib_experiments)
 
 find_package(PkgConfig REQUIRED)
 
@@ -72,14 +72,7 @@ configure_file(dbus/gattlib.pc.in ${PROJECT_BINARY_DIR}/gattlib.pc @ONLY)
 set(ENV{PKG_CONFIG_PATH} "${PROJECT_BINARY_DIR}:$ENV{PKG_CONFIG_PATH}")
 
 # Examples
-add_subdirectory(examples/ble_scan)
-add_subdirectory(examples/discover)
-add_subdirectory(examples/read_write)
-add_subdirectory(examples/notification)
-add_subdirectory(examples/gatttool537)
-add_subdirectory(examples/hcitool)
 add_subdirectory(examples/CentralNordicUartService)
-add_subdirectory(examples/nordic_uart)
 
 # Some examples require Bluez code and other DBus support
 if (NOT GATTLIB_DBUS)
