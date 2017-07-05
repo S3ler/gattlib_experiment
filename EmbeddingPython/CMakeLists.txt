@@ -56,6 +56,9 @@ target_link_libraries(EmbeddingPython_CallFunction ${GATTLIB_LIBRARIES} ${GLIB_L
 add_executable(EmbeddingPython_CallClass call_class.c)
 target_link_libraries(EmbeddingPython_CallClass ${GATTLIB_LIBRARIES} ${GLIB_LIBRARIES} python2.7 )
 
+add_executable(EmbeddingPython_CallByteArrayClass_Test call_bytearrayclass.c)
+target_link_libraries(EmbeddingPython_CallByteArrayClass_Test ${GATTLIB_LIBRARIES} ${GLIB_LIBRARIES} python2.7 )
+
 add_executable(EmbeddingPython_CallClass_Test call_class_test.c)
 target_link_libraries(EmbeddingPython_CallClass_Test ${GATTLIB_LIBRARIES} ${GLIB_LIBRARIES} python2.7 )
 
