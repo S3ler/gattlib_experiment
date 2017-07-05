@@ -453,6 +453,10 @@ def find_adapter(bus, adapter):
 def send_user_input(nus_service):
     while True:
         user_input = raw_input("Some input please: \n")
+        if user_input == 'exit':
+            mainloop.quit()
+            break
+
         if nus_service.send_bytes(user_input) :
             print("send")
         else:
@@ -517,3 +521,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
