@@ -13,7 +13,6 @@
 
 int main(int argc, char *argv[]) {
     PyObject *pName, *pModule, *pDict, *pClass, *pInstance, *pValue;
-    int i, arg[8];
 
     if (argc < 4) {
         fprintf(stderr, "Usage: call python_filename class_name function_name\n");
@@ -47,13 +46,18 @@ int main(int argc, char *argv[]) {
     // Build parameter list
     // Call a method of the class with two parameters
     // https://www2.informatik.hu-berlin.de/Themen/manuals/python/python-ext/section2_2_8.html
-    const uint8_t to_write[6] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05};
+    uint8_t to_write[6] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05};
     uint8_t to_write_length = 6;
+    /* was a try -> Segmentation fault
+    PyByteArrayObject to_write_pArray;
+    to_write_pArray.ob_bytes = (char *) to_write;
+    to_write_pArray.ob_size = 6;
+    pValue = PyObject_CallMethodObjArgs(pInstance, argv[3], (PyObject*) &to_write_pArray);
+    */
     pValue = PyObject_CallMethod(pInstance, argv[3], "(cccccci)",
                                  to_write[0], to_write[1], to_write[2],
                                  to_write[3], to_write[4], to_write[5],
                                  to_write_length);
-
 
     if (pValue != NULL) {
         if(PyByteArray_Check(pValue)){
@@ -62,8 +66,13 @@ int main(int argc, char *argv[]) {
 
             PyByteArrayObject* pArray = (PyByteArrayObject *) pValue;
             Py_ssize_t pArraySize = pArray->ob_size;
+
+            if (pArraySize <= TO_RECEIVE_SIZE) {
+                memcpy(to_receive, pArray->ob_bytes, (size_t) pArraySize);
+            }
+
             printf("Return of call type: %s\n", pValue->ob_type->tp_name);
-            printf("Return of call size: %d\n", pArraySize);
+            printf("Return of call size: %zd\n", pArraySize);
             printf("Return of call bytes: ");
             printf("%02X:%02X:%02X:%02X:%02X:%02X\n",
                    pArray->ob_bytes[0], pArray->ob_bytes[1],
