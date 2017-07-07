@@ -15,6 +15,7 @@ import threading
 BATTERY_SERVICE_UUID = '0001'
 
 mainloop = None
+nus_service = None
 
 BLUEZ_SERVICE_NAME = 'org.bluez'
 LE_ADAPTER = '/org/bluez/hci0'
@@ -450,21 +451,19 @@ def find_adapter(bus, adapter):
 
     return None
 
-def send_user_input(nus_service):
-    while True:
-        user_input = raw_input("Some input please: \n")
-        if user_input == 'exit':
-            mainloop.quit()
-            break
 
-        if nus_service.send_bytes(user_input) :
-            print("send")
-        else:
-            print("too long or internal error")
+def send_user_input(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19,length):
+    to_send_buffer = bytearray([c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19])
+    to_send_length = length
+    to_send_buffer = to_send_buffer[0:to_send_length]
+    return nus_service.send_bytes(to_send_buffer)
+
+
 def run_mainloop():
     mainloop.run()
 
-def main():
+
+def init():
     import os
     print os.name
     import platform
@@ -514,13 +513,9 @@ def main():
                                      reply_handler=register_ad_cb,
                                      error_handler=register_ad_error_cb)
 
-    user_input_thread = threading.Thread(target=send_user_input, args=(nus_service,))
+    user_input_thread = threading.Thread(target=run_mainloop, args=())
     user_input_thread.start()
 
-    mainloop.run()
 
-
-if __name__ == '__main__':
-    main()
 
 
