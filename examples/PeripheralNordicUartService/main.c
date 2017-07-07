@@ -9,17 +9,74 @@
 const int len = 1024;
 char pBuf[1024];
 volatile bool stopped = false;
+volatile bool await = false;
+volatile bool awaiting = false;
 
-void loop(void *arg) {
+#define Sleep(x) sleep(x/1000)
+
+void* join_pythread(void *arg) {
+    PyObject *pValue;
     PyObject *pInstance = (PyObject *) arg;
     while (!stopped) {
         // !!!Important!!! C thread will not release CPU to Python thread without the following call.
-        PyObject_CallMethod(pInstance, "join", "(f)", 0.001);
+        pValue = PyObject_CallMethod(pInstance, "join", "(f)", 0.001);
+        if(pValue == NULL){
+                PyErr_Print();
+        }
+        Py_DECREF(pValue);
+        while(await){
+            awaiting = true;
+            Sleep(1);
+        }
+        awaiting = false;
+        Sleep(10);
+        /**/
+        // check if message arrived
+        pValue = PyObject_CallMethod(pInstance, "is_new_message_arrived", NULL);
+        if (pValue != NULL) {
+            // printf("Return of call : %d\n", PyInt_AsLong(pValue));
+            if (PyInt_AsLong(pValue) == 1) {
+                printf("is_new_message_arrived: %d\n", PyInt_AsLong(pValue));
+                Py_DECREF(pValue);
+                pValue = PyObject_CallMethod(pInstance, "get_new_message", NULL);
+                if (pValue != NULL) {
+                    printf("is_new_message_arrived: %s\n", PyByteArray_AsString(pValue));
+                } else {
+                    PyErr_Print();
+                }
+            }
+            Py_DECREF(pValue);
+        } else {
+            PyErr_Print();
+        }
+        /**/
     }
+    return NULL;
 }
 
-void ble_init(void* arg){
-
+void* poll_message(void *arg) {
+    PyObject *pValue;
+    PyObject *pInstance = (PyObject *) arg;
+    while (!stopped) {
+        pValue = PyObject_CallMethod(pInstance, "is_new_message_arrived", NULL);
+        if (pValue != NULL) {
+            // printf("Return of call : %d\n", PyInt_AsLong(pValue));
+            if (PyInt_AsLong(pValue) == 1) {
+                printf("is_new_message_arrived: %d\n", PyInt_AsLong(pValue));
+                Py_DECREF(pValue);
+                pValue = PyObject_CallMethod(pInstance, "get_new_message", NULL);
+                if (pValue != NULL) {
+                    printf("is_new_message_arrived: %s\n", PyByteArray_AsString(pValue));
+                } else {
+                    PyErr_Print();
+                }
+            }
+            Py_DECREF(pValue);
+        } else {
+            PyErr_Print();
+        }
+    }
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {
@@ -33,92 +90,85 @@ int main(int argc, char *argv[]) {
     char syspathappend[1024] = {0};
     sprintf(syspathappend, "sys.path.append(\"%s\")", dirname(pBuf));
     printf("%s\n", syspathappend);
-    PyObject *pName, *pModule, *pDict, *pFunc, *pInstance, *pValue;
+    PyObject *pName, *pModule, *pDict, *pClass, *pInstance, *pValue, *pFunc;
 
     // Initialize python inerpreter
     Py_Initialize();
 
     PyRun_SimpleString("import sys");
-    PyRun_SimpleString(syspathappend);
-    //PyRun_SimpleString("sys.path.append(\"/home/bele/mqttsngit/mqtt-sn-gateway/gattlib_experiments/examples/PeripheralNordicUartService\")");
+    //PyRun_SimpleString(syspathappend);
+    PyRun_SimpleString("sys.path.append(\"/home/bele/mqttsngit/mqtt-sn-gateway/gattlib_experiments/examples/PeripheralNordicUartService\")");
 
-    /*
-    // Initialize thread support
-    PyEval_InitThreads();
-
-    // Save a pointer to the main PyThreadState object
-    PyThreadState *mainThreadState = PyThreadState_Get();
-
-    // Get a reference to the PyInterpreterState
-    PyInterpreterState *mainInterpreterState = mainThreadState->interp;
-
-    // Create a thread state object for this thread
-    PyThreadState* myThreadState = PyThreadState_New(mainInterpreterState);
-
-    // Release global lock
-    PyEval_ReleaseLock();*/
 
     pName = PyString_FromString("py_nusperipheral");
     pModule = PyImport_Import(pName);
     if (pModule == NULL) {
         printf("pModule is NULL");
+        return 1;
     }
     pDict = PyModule_GetDict(pModule);
 
     // Auslagern:
-    pFunc = PyDict_GetItemString(pDict, "init2");
-
-    if (!PyCallable_Check(pFunc)) {
-        printf("PyCallable_Check for pFunc failed");
-        exit(0);
-    }
-
-    pValue = PyObject_CallObject(pFunc, NULL);
-
-    if (pValue != NULL) {
-        printf("Return of call : %d\n", PyInt_AsLong(pValue));
-        Py_DECREF(pValue);
-    } else {
+    pClass = PyDict_GetItemString(pDict, "MyThread");
+    if (pClass == NULL || !PyCallable_Check(pClass)) {
         PyErr_Print();
+        fprintf(stderr, "The class \"%s\" is not callable\n", argv[2]);
+        return 1;
     }
 
-    // here start thread with:
-    /*
-    while(!stopped)
-    {
-        // !!!Important!!! C thread will not release CPU to Python thread without the following call.
-        PyObject_CallMethod(pInstance, "join", "(f)", 0.001);
+    // Create instance
+    pInstance = PyObject_CallObject(pClass, NULL);
+    if (pInstance == NULL) {
+        PyErr_Print();
+        fprintf(stderr, "Failed to create the class instance \"%s\"\n", argv[2]);
+        return 1;
     }
-    */
-    pFunc = PyDict_GetItemString(pDict, "send_user_input");
 
-    if (!PyCallable_Check(pFunc)) {
-        printf("PyCallable_Check for pFunc failed");
-        exit(0);
+    pValue = PyObject_CallMethod(pInstance, "start", NULL);
+    if(pValue == NULL){
+        PyErr_Print();
+        return 1;
     }
 
     pthread_t mythread;
-    pthread_create(&mythread, NULL,
-                   loop, NULL);
+    pthread_create(&mythread, NULL, join_pythread, pInstance);
+
+    //pFunc = PyDict_GetItemString(pDict, "is_new_message_arrived");
+
+    if(pFunc == NULL){
+        PyErr_Print();
+        return 1;
+    }
 
     while (true) {
-        char b[1024] = {0};
-        printf("input what you wand to send: ");
-        scanf("%d", b);
-        if (strcmp(b, "exit") == 0) {
+        size_t characters = -1;
+        size_t buffer_size = 1024;
+        char buffer[1024] = {0};
+        printf("input what you want to send: ");
+        char *b = buffer;
+        characters = getline(&b,&buffer_size,stdin);
+        if (strcmp(buffer, "exit") == 0) {
             stopped = true;
             break;
         }
-        if (strlen(b) + 1 > 20) {
+        if (strlen(buffer) + 1 > 20) {
             printf("Input too long");
             continue;
         }
-        pValue = PyObject_CallFunction(pFunc, "cccccccccccccccccccci",
-                                       b[0], b[1], b[2], b[3], b[4],
-                                       b[5], b[6], b[7], b[8], b[9],
-                                       b[10], b[11], b[12], b[13], b[14],
-                                       b[15], b[16], b[17], b[18], b[19],
-                                       strlen(b) + 1);
+        await = true;
+        while(!awaiting){ }
+        // pValue = PyObject_CallFunction(pFunc,NULL);
+        // pValue = PyObject_CallMethod(pInstance, "is_new_message_arrived", NULL);
+
+        pValue = PyObject_CallMethod(pInstance, "send_user_input",
+                                     "cccccccccccccccccccci",
+                                     buffer[0], buffer[1], buffer[2], buffer[3], buffer[4],
+                                     buffer[5], buffer[6], buffer[7], buffer[8], buffer[9],
+                                     buffer[10], buffer[11], buffer[12], buffer[13], buffer[14],
+                                     buffer[15], buffer[16], buffer[17], buffer[18], buffer[19],
+                                     (strlen(buffer) + 1));
+
+        await = false;
         if (pValue != NULL) {
             printf("Return of call : %d\n", PyInt_AsLong(pValue));
             Py_DECREF(pValue);
@@ -126,6 +176,10 @@ int main(int argc, char *argv[]) {
             PyErr_Print();
         }
     }
+
+
+    printf("C thread join and wait for Python thread to complete...\n");
+    PyObject_CallMethod(pInstance, "join", NULL);
 
     // Clean up
     Py_DECREF(pModule);

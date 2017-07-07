@@ -7,7 +7,7 @@ import dbus.service
 
 import array
 from gi.repository import GObject as gobject
-# import gobject
+#import gobject
 
 from random import randint
 import threading
@@ -27,9 +27,11 @@ LE_ADVERTISEMENT_IFACE = 'org.bluez.LEAdvertisement1'
 GATT_MANAGER_IFACE = 'org.bluez.GattManager1'
 
 GATT_SERVICE_IFACE = 'org.bluez.GattService1'
-GATT_CHRC_IFACE = 'org.bluez.GattCharacteristic1'
-GATT_DESC_IFACE = 'org.bluez.GattDescriptor1'
+GATT_CHRC_IFACE =    'org.bluez.GattCharacteristic1'
+GATT_DESC_IFACE =    'org.bluez.GattDescriptor1'
 
+newMessageArrived = False
+newMessage = [0] * 20
 
 class InvalidArgsException(dbus.exceptions.DBusException):
     _dbus_error_name = 'org.freedesktop.DBus.Error.InvalidArgs'
@@ -124,8 +126,8 @@ class Advertisement(dbus.service.Object):
     def Release(self):
         print '%s: Released!' % self.path
 
-
 class NUSAdvertisment(Advertisement):
+
     def __init__(self, bus, index):
         Advertisement.__init__(self, bus, index, 'peripheral')
         self.add_service_uuid(BATTERY_SERVICE_UUID)
@@ -156,13 +158,13 @@ class Service(dbus.service.Object):
 
     def get_properties(self):
         return {
-            GATT_SERVICE_IFACE: {
-                'UUID': self.uuid,
-                'Primary': self.primary,
-                'Characteristics': dbus.Array(
-                    self.get_characteristic_paths(),
-                    signature='o')
-            }
+                GATT_SERVICE_IFACE: {
+                        'UUID': self.uuid,
+                        'Primary': self.primary,
+                        'Characteristics': dbus.Array(
+                                self.get_characteristic_paths(),
+                                signature='o')
+                }
         }
 
     def get_path(self):
@@ -218,15 +220,15 @@ class Characteristic(dbus.service.Object):
 
     def get_properties(self):
         return {
-            GATT_CHRC_IFACE: {
-                'Service': self.service.get_path(),
-                'UUID': self.uuid,
-                'Flags': self.flags,
-                'Value': dbus.Array(self.value, signature='ay'),
-                'Descriptors': dbus.Array(
-                    self.get_descriptor_paths(),
-                    signature='o')
-            }
+                GATT_CHRC_IFACE: {
+                        'Service': self.service.get_path(),
+                        'UUID': self.uuid,
+                        'Flags': self.flags,
+                        'Value' : dbus.Array(self.value, signature='ay'),
+                        'Descriptors': dbus.Array(
+                                self.get_descriptor_paths(),
+                                signature='o')
+                }
         }
 
     def get_path(self):
@@ -290,11 +292,11 @@ class Descriptor(dbus.service.Object):
 
     def get_properties(self):
         return {
-            GATT_DESC_IFACE: {
-                'Characteristic': self.chrc.get_path(),
-                'UUID': self.uuid,
-                'Flags': self.flags,
-            }
+                GATT_DESC_IFACE: {
+                        'Characteristic': self.chrc.get_path(),
+                        'UUID': self.uuid,
+                        'Flags': self.flags,
+                }
         }
 
     def get_path(self):
@@ -329,6 +331,7 @@ class NUSService(Service):
     # NUS Service UUID
     TEST_SVC_UUID = '6E400001-B5A3-F393-E0A9-E50E24DCCA9E'
 
+
     def __init__(self, bus, index):
         Service.__init__(self, bus, index, self.TEST_SVC_UUID, False)
         self.add_characteristic(RXCharacteristic(bus, 0, self))
@@ -348,20 +351,20 @@ class TXCharacteristic(Characteristic):
 
     def __init__(self, bus, index, service):
         Characteristic.__init__(
-            self, bus, index,
-            self.TX_CHRC_UUID,
-            ['read', 'notify'],
-            service)
+                self, bus, index,
+                self.TX_CHRC_UUID,
+                ['read', 'notify'],
+                service)
         self.notifying = False
         self.tx_bytes = []
-        # gobject.timeout_add(5000, self.send_hello)
+        #gobject.timeout_add(5000, self.send_hello)
 
     def notify_tx_bytes(self):
         if not self.notifying:
             return
         self.PropertiesChanged(
-            GATT_CHRC_IFACE,
-            {'Value': dbus.ByteArray(self.tx_bytes)}, [])
+                GATT_CHRC_IFACE,
+                { 'Value': dbus.ByteArray(self.tx_bytes) }, [])
 
     def send_hello(self):
         self.tx_bytes = "Hello"
@@ -370,7 +373,7 @@ class TXCharacteristic(Characteristic):
         return True
 
     def send_tx_bytes(self, tx_bytes):
-        if len(tx_bytes) > 20:
+        if len(tx_bytes)>20 :
             return False
 
         self.tx_bytes = tx_bytes
@@ -402,23 +405,22 @@ class RXCharacteristic(Characteristic):
     TODO: fill description
     """
 
-    # TX Characteristic (UUID: 6E400002-B5A3-F393-E0A9-E50E24DCCA9E):
-    # RX Characteristic (UUID: 6E400003-B5A3-F393-E0A9-E50E24DCCA9E):
+    #TX Characteristic (UUID: 6E400002-B5A3-F393-E0A9-E50E24DCCA9E):
+    #RX Characteristic (UUID: 6E400003-B5A3-F393-E0A9-E50E24DCCA9E):
     RX_CHRC_UUID = '6E400003-B5A3-F393-E0A9-E50E24DCCA9E'
-
     #                ['write','writable-auxiliaries'],
 
     def __init__(self, bus, index, service):
         Characteristic.__init__(
-            self, bus, index,
-            self.RX_CHRC_UUID,
-            ['write', 'writable-auxiliaries'],
-            service)
+                self, bus, index,
+                self.RX_CHRC_UUID,
+                ['write', 'writable-auxiliaries'],
+                service)
         self.rx_bytes = []
 
     def ReadValue(self):
         print('RX Bytes read: ' + repr(self.rx_bytes))
-        # return self.rx_bytes
+        #return self.rx_bytes
         return self.value
 
     def WriteValue(self, value):
@@ -426,11 +428,13 @@ class RXCharacteristic(Characteristic):
         global newMessage
         newMessageArrived = True
         newMessage = bytearray(value)
+
         print('RX Write: ' + repr(value))
         print((repr(self.get_properties())))
         self.value = value
+        print((repr(self.get_properties())))
+        #self.rx_bytes = value
 
-        # self.rx_bytes = value
 
 
 def register_service_cb():
@@ -448,21 +452,20 @@ def find_adapter(bus, adapter):
     objects = remote_om.GetManagedObjects()
 
     for o, props in objects.iteritems():
-        if (str(o) == str(adapter)) and props.has_key(GATT_MANAGER_IFACE):
+        if (str(o) == str(adapter)) and props.has_key(GATT_MANAGER_IFACE) :
             return o
 
     return None
 
 
-def send_user_input(c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, length):
-    to_send_buffer = bytearray([c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19])
+def send_user_input(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19,length):
+    to_send_buffer = bytearray([c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19])
     to_send_length = length
     to_send_buffer = to_send_buffer[0:to_send_length]
     return nus_service.send_bytes(to_send_buffer)
 
 
 def run_mainloop():
-    mainloop.run()
 
 
 def init():
@@ -471,10 +474,10 @@ def init():
     import platform
     print platform.system()
     print platform.release()
-    print platform.python_implementation()  # need to be CPython!
+    print platform.python_implementation() # need to be CPython!
+
 
     global mainloop
-    global nus_service
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
@@ -486,8 +489,8 @@ def init():
         return
 
     service_manager = dbus.Interface(
-        bus.get_object(BLUEZ_SERVICE_NAME, adapter),
-        GATT_MANAGER_IFACE)
+            bus.get_object(BLUEZ_SERVICE_NAME, adapter),
+            GATT_MANAGER_IFACE)
 
     nus_service = NUSService(bus, 0)
 
@@ -497,10 +500,12 @@ def init():
                                     reply_handler=register_service_cb,
                                     error_handler=register_service_error_cb)
 
+
     adapter_props = dbus.Interface(bus.get_object(BLUEZ_SERVICE_NAME, adapter),
                                    "org.freedesktop.DBus.Properties");
 
     adapter_props.Set("org.bluez.Adapter1", "Powered", dbus.Boolean(1))
+
 
     ad_manager = dbus.Interface(bus.get_object(BLUEZ_SERVICE_NAME, adapter),
                                 LE_ADVERTISING_MANAGER_IFACE)
@@ -512,40 +517,26 @@ def init():
     ad_manager.RegisterAdvertisement(nus_advertisment.get_path(), {},
                                      reply_handler=register_ad_cb,
                                      error_handler=register_ad_error_cb)
+
     mainloop.run()
 
-
-newMessageArrived = False
-newMessage = [0] * 20
-
-
-def is_new_message_arrived():
-    global newMessageArrived
-    return newMessageArrived
 
 
 class MyThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
-
     def run(self):
-        init()
-
-    def send_user_input(self,c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19,
-                        length):
-        global nus_service
-        to_send_buffer = bytearray(
-            [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19])
+        init();
+    def send_user_input(c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19,length):
+        to_send_buffer = bytearray([c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19])
         to_send_length = length
         to_send_buffer = to_send_buffer[0:to_send_length]
-        return nus_service.send_bytes(to_send_buffer);
-
+        return nus_service.send_bytes(to_send_buffer)
     def is_new_message_arrived(self):
         global newMessageArrived
         return newMessageArrived
-
     def get_new_message(self):
         global newMessageArrived
-        newMessageArrived = False;
         global newMessage
+        newMessageArrived = False
         return bytearray(newMessage)
