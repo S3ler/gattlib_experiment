@@ -5,11 +5,8 @@ import dbus.exceptions
 import dbus.mainloop.glib
 import dbus.service
 
-import array
 from gi.repository import GObject as gobject
-# import gobject
 
-from random import randint
 import threading
 
 BATTERY_SERVICE_UUID = '0001'
@@ -112,10 +109,8 @@ class Advertisement(dbus.service.Object):
                          in_signature='s',
                          out_signature='a{sv}')
     def GetAll(self, interface):
-        print 'GetAll'
         if interface != LE_ADVERTISEMENT_IFACE:
             raise InvalidArgsException()
-        print 'returning props'
         return self.get_properties()[LE_ADVERTISEMENT_IFACE]
 
     @dbus.service.method(LE_ADVERTISEMENT_IFACE,
@@ -135,7 +130,8 @@ class NUSAdvertisment(Advertisement):
 
 
 def register_ad_cb():
-    print 'Advertisement registered'
+    #print 'Advertisement registered'
+    return
 
 
 def register_ad_error_cb(error):
@@ -192,7 +188,6 @@ class Service(dbus.service.Object):
     @dbus.service.method(DBUS_OM_IFACE, out_signature='a{oa{sa{sv}}}')
     def GetManagedObjects(self):
         response = {}
-        print('GetManagedObjects')
 
         response[self.get_path()] = self.get_properties()
         chrcs = self.get_characteristics()
@@ -353,7 +348,7 @@ class TXCharacteristic(Characteristic):
             ['read', 'notify'],
             service)
         self.notifying = False
-        self.tx_bytes = []
+        # self.tx_bytes = []
         # gobject.timeout_add(5000, self.send_hello)
 
     def notify_tx_bytes(self):
@@ -378,7 +373,7 @@ class TXCharacteristic(Characteristic):
         return True
 
     def ReadValue(self):
-        print('TX Bytes read: ' + repr(self.tx_bytes))
+        # print('TX Bytes read: ' + repr(self.tx_bytes))
         return dbus.ByteArray(self.tx_bytes)
 
     def StartNotify(self):
@@ -406,19 +401,16 @@ class RXCharacteristic(Characteristic):
     # RX Characteristic (UUID: 6E400003-B5A3-F393-E0A9-E50E24DCCA9E):
     RX_CHRC_UUID = '6E400003-B5A3-F393-E0A9-E50E24DCCA9E'
 
-    #                ['write','writable-auxiliaries'],
-
     def __init__(self, bus, index, service):
         Characteristic.__init__(
             self, bus, index,
             self.RX_CHRC_UUID,
             ['write', 'writable-auxiliaries'],
             service)
-        self.rx_bytes = []
+        self.rx_bytes = None
 
     def ReadValue(self):
         print('RX Bytes read: ' + repr(self.rx_bytes))
-        # return self.rx_bytes
         return self.value
 
     def WriteValue(self, value):
@@ -426,15 +418,12 @@ class RXCharacteristic(Characteristic):
         global newMessage
         newMessageArrived = True
         newMessage = bytearray(value)
-        print('RX Write: ' + repr(value))
-        print((repr(self.get_properties())))
         self.value = value
-
-        # self.rx_bytes = value
 
 
 def register_service_cb():
-    print('GATT service registered')
+    # print('GATT service registered')
+    return
 
 
 def register_service_error_cb(error):
@@ -454,25 +443,7 @@ def find_adapter(bus, adapter):
     return None
 
 
-def send_user_input(c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, length):
-    to_send_buffer = bytearray([c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19])
-    to_send_length = length
-    to_send_buffer = to_send_buffer[0:to_send_length]
-    return nus_service.send_bytes(to_send_buffer)
-
-
-def run_mainloop():
-    mainloop.run()
-
-
 def init():
-    import os
-    print os.name
-    import platform
-    print platform.system()
-    print platform.release()
-    print platform.python_implementation()  # need to be CPython!
-
     global mainloop
     global nus_service
 
@@ -531,7 +502,7 @@ class MyThread(threading.Thread):
     def run(self):
         init()
 
-    def send_user_input(self,c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19,
+    def send_user_input(self, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19,
                         length):
         global nus_service
         to_send_buffer = bytearray(

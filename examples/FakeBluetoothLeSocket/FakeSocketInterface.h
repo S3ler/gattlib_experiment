@@ -6,17 +6,22 @@
 #define TEST_MQTT_SN_GATEWAY_FAKESOCKETINTERFACE_H
 
 
-struct device_address {
-    uint8_t bytes[8];
-};
+#include <stdint.h>
+#include <cstdio>
+#include "LinuxUdpClientFake.h"
+#include "DeviceAddress.h"
+
+class LinuxUdpClientFake;
+
+
 
 class FakeSocketInterface {
 public:
-    //virtual void setFakeClient(LinuxUdpClientFake *fakeClient)=0;
+    virtual void setFakeClient(LinuxUdpClientFake *fakeClient)=0;
 
     virtual bool isDisconnected() =0;
 
-    virtual ssize_t send(const uint8_t *buf, uint8_t len)=0;
+    virtual size_t send(const uint8_t *buf, uint8_t len)=0;
 
     virtual void connect(device_address *address)=0;
 
