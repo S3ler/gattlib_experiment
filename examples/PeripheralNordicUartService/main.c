@@ -6,8 +6,6 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-const int len = 1024;
-char pBuf[1024];
 volatile bool stopped = false;
 volatile bool await = false;
 volatile bool awaiting = false;
@@ -54,32 +52,11 @@ void* join_pythread(void *arg) {
     return NULL;
 }
 
-void* poll_message(void *arg) {
-    PyObject *pValue;
-    PyObject *pInstance = (PyObject *) arg;
-    while (!stopped) {
-        pValue = PyObject_CallMethod(pInstance, "is_new_message_arrived", NULL);
-        if (pValue != NULL) {
-            // printf("Return of call : %d\n", PyInt_AsLong(pValue));
-            if (PyInt_AsLong(pValue) == 1) {
-                printf("is_new_message_arrived: %d\n", PyInt_AsLong(pValue));
-                Py_DECREF(pValue);
-                pValue = PyObject_CallMethod(pInstance, "get_new_message", NULL);
-                if (pValue != NULL) {
-                    printf("is_new_message_arrived: %s\n", PyByteArray_AsString(pValue));
-                } else {
-                    PyErr_Print();
-                }
-            }
-            Py_DECREF(pValue);
-        } else {
-            PyErr_Print();
-        }
-    }
-    return NULL;
-}
 
 int main(int argc, char *argv[]) {
+
+    const int len = 1024;
+    char pBuf[1024];
     char szTmp[32];
     sprintf(szTmp, "/proc/%d/exe", getpid());
     int bytes = MIN(readlink(szTmp, pBuf, len), len - 1);
@@ -112,7 +89,7 @@ int main(int argc, char *argv[]) {
     pClass = PyDict_GetItemString(pDict, "MyThread");
     if (pClass == NULL || !PyCallable_Check(pClass)) {
         PyErr_Print();
-        fprintf(stderr, "The class \"%s\" is not callable\n", argv[2]);
+        fprintf(stderr, "The class \"%s\" is not callable\n", "MyThread");
         return 1;
     }
 
@@ -120,7 +97,7 @@ int main(int argc, char *argv[]) {
     pInstance = PyObject_CallObject(pClass, NULL);
     if (pInstance == NULL) {
         PyErr_Print();
-        fprintf(stderr, "Failed to create the class instance \"%s\"\n", argv[2]);
+        fprintf(stderr, "Failed to create the class instance \"%s\"\n", "MyThread");
         return 1;
     }
 
@@ -133,12 +110,6 @@ int main(int argc, char *argv[]) {
     pthread_t mythread;
     pthread_create(&mythread, NULL, join_pythread, pInstance);
 
-    //pFunc = PyDict_GetItemString(pDict, "is_new_message_arrived");
-
-    if(pFunc == NULL){
-        PyErr_Print();
-        return 1;
-    }
 
     while (true) {
         size_t characters = -1;
@@ -157,8 +128,6 @@ int main(int argc, char *argv[]) {
         }
         await = true;
         while(!awaiting){ }
-        // pValue = PyObject_CallFunction(pFunc,NULL);
-        // pValue = PyObject_CallMethod(pInstance, "is_new_message_arrived", NULL);
 
         pValue = PyObject_CallMethod(pInstance, "send_user_input",
                                      "cccccccccccccccccccci",
@@ -174,6 +143,7 @@ int main(int argc, char *argv[]) {
             Py_DECREF(pValue);
         } else {
             PyErr_Print();
+            return 1;
         }
     }
 

@@ -50,5 +50,5 @@ endif()
 
 include_directories(/usr/include/python2.7)
 
-add_executable(PNUS main.c)
+add_executable(PNUS ../FakeBluetoothLeSocket/FakeSocketInterface.h ../FakeBluetoothLeSocket/FakeBluetoothLeSocket.h ../FakeBluetoothLeSocket/FakeBluetoothLeSocket.cpp main.c)
 target_link_libraries(PNUS ${GATTLIB_LIBRARIES} ${GLIB_LIBRARIES} python2.7 pthread)
