@@ -7,3 +7,6 @@ set(MAIN_FILE main.cpp)
 
 add_executable(BLEScanner  ${SOURCE_FILES} ${MAIN_FILE})
 target_link_libraries(BLEScanner pthread bluetooth)
+
+add_library(libBLEScanner  ${SOURCE_FILES} )
+target_link_libraries(libBLEScanner pthread bluetooth)

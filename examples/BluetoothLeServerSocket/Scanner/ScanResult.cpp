@@ -5,10 +5,10 @@
 #include <cstring>
 #include "ScanResult.h"
 
-device_address *ScanResult::getDeviceAddress() {
-    return &address;
+device_address *ScanResult::getDeviceAddress() const {
+    return (device_address *) &address;
 }
 
 ScanResult::ScanResult(const device_address *address) {
-    memcpy(this->address.bytes,address->bytes,sizeof(device_address));
+    memcpy(this->address.bytes, address->bytes, sizeof(device_address));
 }

@@ -168,7 +168,7 @@ int Scanner::print_advertising_devices(int device_descriptor, uint8_t filter_typ
                 device_address ble_device_address;
                 memset(ble_device_address.bytes, 0x0, sizeof(device_address));
                 // memcpy(ble_device_address.bytes, &info->bdaddr, sizeof(bdaddr_t));
-                memcpy(ble_device_address.bytes, &info->bdaddr, 6);
+                memcpy(ble_device_address.bytes, &info->bdaddr, sizeof(bdaddr_t));
 
 
                 bool not_in_list = true;
@@ -302,4 +302,9 @@ void Scanner::eir_parse_name(uint8_t *eir, size_t eir_len, char *buf, size_t buf
 void Scanner::setSignal(int sig) {
     std::lock_guard<std::mutex> signal_receive_lock_guard(signal_received_mutex);
     signal_received = sig;
+}
+
+void Scanner::removeScanResult(ScanResult *scanResult) {
+    std::lock_guard<std::mutex> list_lock_guard(list_mutex);
+    scanResults.remove(scanResult);
 }

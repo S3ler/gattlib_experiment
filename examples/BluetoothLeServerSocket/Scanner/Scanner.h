@@ -55,6 +55,8 @@ public:
 
     void setSignal(int sig);
 
+    void removeScanResult(ScanResult *scanResult);
+
 private:
     void lescan(uint16_t duration);
 
