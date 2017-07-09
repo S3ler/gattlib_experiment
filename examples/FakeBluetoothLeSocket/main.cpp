@@ -2,7 +2,7 @@
 *
 *  FakeBluetoothLESocket
 *
-*  Copyright (C) 2017  S3ler
+*  Copyright (C) 2017  Gabriel Nikol
 *
 *
 +  This program is free software; you can redistribute it and/or modify

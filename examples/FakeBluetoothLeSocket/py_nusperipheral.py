@@ -1,5 +1,27 @@
 #!/usr/bin/python
 
+#
+#  py_nusperipheral - modified file test/example-gatt-client from bluez-5.37 sources
+#
+#  Copyright (C) 2017 - Gabriel Nikol and all bluez authors
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+#
+
+
+
 import dbus
 import dbus.exceptions
 import dbus.mainloop.glib
@@ -130,7 +152,7 @@ class NUSAdvertisment(Advertisement):
 
 
 def register_ad_cb():
-    #print 'Advertisement registered'
+    # print 'Advertisement registered'
     return
 
 
@@ -495,7 +517,7 @@ def is_new_message_arrived():
     return newMessageArrived
 
 
-class MyThread(threading.Thread):
+class NUSPeripheral(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
 

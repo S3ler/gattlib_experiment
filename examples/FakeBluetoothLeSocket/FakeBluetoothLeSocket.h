@@ -2,7 +2,7 @@
 *
 *  Fake Bluetooth LE Socket
 *
-*  Copyright (C) 2017  S3ler
+*  Copyright (C) 2017  Gabriel Nikol
 *
 *
 +  This program is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@
 #include "FakeSocketInterface.h"
 
 #define PYTHON_MODULE_NAME "py_nusperipheral"
-#define PYTHON_NUSPHERIPHERAL_CLASSNAME "MyThread"
+#define PYTHON_NUSPHERIPHERAL_CLASSNAME "NUSPeripheral"
 #define PYTHON_PERIPHERAL_START_METHODNAME "start"
 #define PYTHON_PERIPHERAL_SEND_METHODNAME "send_user_input"
 #define PYTHON_PERIPHERAL_CHECKFORMESSAGEARRIVED_METHODNAME "is_new_message_arrived"
