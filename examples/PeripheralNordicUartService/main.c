@@ -1,4 +1,25 @@
-
+/*
+*
+*  Pentral Nordic Uart Service - CNUS
+*
+*  Copyright (C) 2017  S3ler
+*
+*
++  This program is free software; you can redistribute it and/or modify
+*  it under the terms of the GNU General Public License as published by
+*  the Free Software Foundation; either version 2 of the License, or
+*  (at your option) any later version.
+*
+*  This program is distributed in the hope that it will be useful,
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*  GNU General Public License for more details.
+*
+*  You should have received a copy of the GNU General Public License
+*  along with this program; if not, write to the Free Software
+*  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+*
+*/
 
 #include <Python.h>
 #include <sys/param.h>
@@ -12,17 +33,17 @@ volatile bool awaiting = false;
 
 #define Sleep(x) sleep(x/1000)
 
-void* join_pythread(void *arg) {
+void *join_pythread(void *arg) {
     PyObject *pValue;
     PyObject *pInstance = (PyObject *) arg;
     while (!stopped) {
         // !!!Important!!! C thread will not release CPU to Python thread without the following call.
         pValue = PyObject_CallMethod(pInstance, "join", "(f)", 0.001);
-        if(pValue == NULL){
-                PyErr_Print();
+        if (pValue == NULL) {
+            PyErr_Print();
         }
         Py_DECREF(pValue);
-        while(await){
+        while (await) {
             awaiting = true;
             Sleep(1);
         }
@@ -74,7 +95,8 @@ int main(int argc, char *argv[]) {
 
     PyRun_SimpleString("import sys");
     //PyRun_SimpleString(syspathappend);
-    PyRun_SimpleString("sys.path.append(\"/home/bele/mqttsngit/mqtt-sn-gateway/gattlib_experiments/examples/PeripheralNordicUartService\")");
+    PyRun_SimpleString(
+            "sys.path.append(\"/home/bele/mqttsngit/mqtt-sn-gateway/gattlib_experiments/examples/PeripheralNordicUartService\")");
 
 
     pName = PyString_FromString("py_nusperipheral");
@@ -102,7 +124,7 @@ int main(int argc, char *argv[]) {
     }
 
     pValue = PyObject_CallMethod(pInstance, "start", NULL);
-    if(pValue == NULL){
+    if (pValue == NULL) {
         PyErr_Print();
         return 1;
     }
@@ -117,7 +139,7 @@ int main(int argc, char *argv[]) {
         char buffer[1024] = {0};
         printf("input what you want to send: ");
         char *b = buffer;
-        characters = getline(&b,&buffer_size,stdin);
+        characters = getline(&b, &buffer_size, stdin);
         if (strcmp(buffer, "exit") == 0) {
             stopped = true;
             break;
@@ -127,7 +149,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
         await = true;
-        while(!awaiting){ }
+        while (!awaiting) {}
 
         pValue = PyObject_CallMethod(pInstance, "send_user_input",
                                      "cccccccccccccccccccci",

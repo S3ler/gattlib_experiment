@@ -348,7 +348,7 @@ class TXCharacteristic(Characteristic):
             ['read', 'notify'],
             service)
         self.notifying = False
-        # self.tx_bytes = []
+        self.tx_bytes = 0
         # gobject.timeout_add(5000, self.send_hello)
 
     def notify_tx_bytes(self):
