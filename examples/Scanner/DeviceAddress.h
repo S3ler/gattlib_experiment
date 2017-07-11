@@ -24,7 +24,7 @@
 #ifndef GATTLIB_EXPERIMENTS_DEVICEADDRESS_H
 #define GATTLIB_EXPERIMENTS_DEVICEADDRESS_H
 
-#include <cstdint>
+#include <stdint.h>
 
 struct device_address {
     uint8_t bytes[8];

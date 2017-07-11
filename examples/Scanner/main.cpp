@@ -5,7 +5,7 @@
 #include <iostream>
 #include "Scanner.h"
 #include "ScanResult.h"
-#include "../../FakeBluetoothLeSocket/DeviceAddress.h"
+#include "../FakeBluetoothLeSocket/DeviceAddress.h"
 #include <list>
 
 int main(int argc, char *argv[]) {

@@ -15,6 +15,7 @@ int main(int argc, char *argv[]) {
 
     // scan for 10 seconds
     scanner.scan(1);
+    /*
     while (true) {
 
         std::list<ScanResult *> scanResults = scanner.getScanResults();
@@ -35,7 +36,7 @@ int main(int argc, char *argv[]) {
             goto done;
         }
     }
-
+    */
     for (auto &&scanResult : scanner.getScanResults()) {
         Connection *connection = new Connection(scanResult);
         if (!connection->connect()) {

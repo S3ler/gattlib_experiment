@@ -73,10 +73,9 @@ set(ENV{PKG_CONFIG_PATH} "${PROJECT_BINARY_DIR}:$ENV{PKG_CONFIG_PATH}")
 
 # Examples
 add_subdirectory(EmbeddingPython)
-add_subdirectory(examples/BluetoothLeServerSocket/Scanner)
-add_subdirectory(examples/BluetoothLeServerSocket/Connection)
+add_subdirectory(examples/Scanner)
+add_subdirectory(examples/Connection)
 add_subdirectory(examples/FakeBluetoothLeSocket)
-add_subdirectory(examples/CentralNordicUartService)
 add_subdirectory(examples/PeripheralNordicUartService)
 
 # Some examples require Bluez code and other DBus support

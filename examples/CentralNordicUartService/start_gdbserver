@@ -4,5 +4,4 @@
 # Linux MyComputerName 4.8.0-58-generic #63~16.04.1-Ubuntu SMP Mon Jun 26 18:08:51 UTC 2017 x86_64 x86_64 x86_64 GNU/Linux
 # $ bluetoothd -v
 # 5.37
-cd ~/mqttsngit/mqtt-sn-gateway/gattlib_experiments/cmake-build-debug/examples/CentralNordicUartService
-sudo gdbserver --once localhost:8888 ./CNUS
+sudo gdbserver --once localhost:8888 ./cmake-build-debug/examples/CentralNordicUartService/CNUS

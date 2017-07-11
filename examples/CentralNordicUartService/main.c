@@ -47,7 +47,7 @@
 #include "src/shared/util.h"
 
 int scan_duration = 2;
-const char *peripheral_mac = "00:1A:7D:DA:71:12";
+const char *peripheral_mac = "00:1A:7D:DA:71:11";
 
 
 #define TX_CHRC_UUID "6e400003-b5a3-f393-e0a9-e50e24dcca9e"

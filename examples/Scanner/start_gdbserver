@@ -5,4 +5,4 @@
 # $ bluetoothd -v
 # 5.37
 
-sudo gdbserver --once localhost:8888 ./cmake-build-debug/examples/BluetoothLeServerSocket/Connection/BLEConnection
+sudo gdbserver --once localhost:8888 ./cmake-build-debug/examples/Scanner/BLEScanner
