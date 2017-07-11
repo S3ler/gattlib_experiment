@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
             goto done;
         }
         if (str2ba(input.c_str(), &bdaddr) == -1) {
-            std::cout << "invalid MAC - usage: BLE MAC Adresse in Form FF:AA:BB:CC:99:88" << std::endl;
+            std::cout << "invalid MAC - usage: BLE MAC Adresse in Form 00:1A:7D:DA:71:11" << std::endl;
             continue;
         }
         device_address addr;
@@ -82,15 +82,22 @@ int main(int argc, char *argv[]) {
                 std::cout << "Connection found - input message now" << std::endl;
                 std::string message;
                 getline(std::cin, message);
-                if (input.compare("exit") == 0) {
+                if (message.compare("exit") == 0) {
                     goto done;
+                }
+                if(message.compare("close")==0){
+                    std::cout << "closing connection" << std::endl;
+                    active_connections.erase(iterator);
+                    connection->close();
+                    delete (connection);
+                    break;
                 }
                 if (connection->send((uint8_t *) message.c_str(), (uint16_t) message.length())) {
                     std::cout << "Send - success" << std::endl;
                 } else {
                     std::cout << "Send - failure" << std::endl;
-                    connection->close();
                     active_connections.erase(iterator);
+                    connection->close();
                     delete (connection);
                 }
                 break;

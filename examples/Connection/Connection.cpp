@@ -62,7 +62,7 @@ bool Connection::connect() {
 void Connection::close() {
     if(g_main_loop_is_running(event_loop)){
         g_main_loop_quit(event_loop);
-        //g_lib_main_thread.join();
+        g_lib_main_thread.join();
     }
 
 
@@ -207,7 +207,6 @@ void Connection::disconnect_io() {
     g_attrib_unref(attrib);
     attrib = NULL;
     opt_mtu = 0;
-
     g_io_channel_shutdown(iochannel, FALSE, NULL);
     g_io_channel_unref(iochannel);
     iochannel = NULL;
