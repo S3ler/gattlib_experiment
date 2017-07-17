@@ -31,6 +31,8 @@
  * declaration, and the extended properties are defined as descriptor.
  */
 
+#include "gattrib.h"
+
 #define GATT_CHR_PROP_BROADCAST				0x01
 #define GATT_CHR_PROP_READ				0x02
 #define GATT_CHR_PROP_WRITE_WITHOUT_RESP		0x04

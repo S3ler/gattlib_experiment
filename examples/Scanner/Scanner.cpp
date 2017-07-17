@@ -39,8 +39,10 @@ void Scanner::scan(uint16_t duration) {
     lescan(duration);
 }
 
+
 void Scanner::stop() {
     stopped = true;
+    scan_thread.join();
 }
 
 void Scanner::lescan(uint16_t duration) {
@@ -77,7 +79,7 @@ void Scanner::lescan(uint16_t duration) {
 
     printf("LE Scan ...\n");
 
-    err = print_advertising_devices(device_descriptor, filter_type, duration);
+    err = print_advertising_devices(device_descriptor, filter_type, duration, callbackInterface);
     if (err < 0) {
         perror("Could not receive advertising events");
         exit(1);
@@ -86,15 +88,19 @@ void Scanner::lescan(uint16_t duration) {
     err = hci_le_set_scan_enable(device_descriptor, 0x00, filter_dup, 10000);
     if (err < 0) {
         perror("Disable scan failed");
-        exit(1);
+        // TODO we ignore it because when we connect without disabling the scanning, the disabling does not work
+        //exit(1);
+        stopped = true;
     }
 
     hci_close_dev(device_descriptor);
+    stopped = true;
 
 }
 
 
-int Scanner::print_advertising_devices(int device_descriptor, uint8_t filter_type, int duration) {
+int Scanner::print_advertising_devices(int device_descriptor, uint8_t filter_type, int duration,
+                                       ScannerCallbackInterface *callbackInterface) {
     unsigned char buf[HCI_MAX_EVENT_SIZE], *ptr;
     struct hci_filter nf, of;
     struct sigaction sa;
@@ -160,7 +166,7 @@ int Scanner::print_advertising_devices(int device_descriptor, uint8_t filter_typ
                            name, sizeof(name) - 1);
 
             // HERE
-            printf("Discovered: %s %s\n", addr, name);
+            // printf("Discovered: %s %s\n", addr, name);
 
             // check if connection already in list
             {
@@ -179,9 +185,15 @@ int Scanner::print_advertising_devices(int device_descriptor, uint8_t filter_typ
                         break;
                     }
                 }
-                if(not_in_list){
+                if (not_in_list) {
                     ScanResult *result = new ScanResult(&ble_device_address);
                     scanResults.push_front(result);
+                    if (callbackInterface != nullptr) {
+                        bool cb_return = callbackInterface->onScanReceive(result);
+                        if (!cb_return) {
+                            stopped = true;
+                        }
+                    }
                 }
             }
 
@@ -295,6 +307,7 @@ void Scanner::eir_parse_name(uint8_t *eir, size_t eir_len, char *buf, size_t buf
         eir += field_len + 1;
     }
 
+
     failed:
     snprintf(buf, buf_len, "(unknown)");
 }
@@ -307,4 +320,34 @@ void Scanner::setSignal(int sig) {
 void Scanner::removeScanResult(ScanResult *scanResult) {
     std::lock_guard<std::mutex> list_lock_guard(list_mutex);
     scanResults.remove(scanResult);
+    delete (scanResult);
+}
+
+void Scanner::scanWithCallback() {
+    stopped = false;
+    lescan(0);
+    this->callbackInterface = nullptr;
+}
+
+
+void Scanner::scan(ScannerCallbackInterface *callbackInterface) {
+    global_scanner = this;
+    this->callbackInterface = callbackInterface;
+    stopped = false;
+    this->scan_thread = std::thread(&Scanner::scanWithCallback, this);
+}
+
+bool Scanner::isRunning() {
+    return !stopped;
+}
+
+
+bool deleteAll(ScanResult *connection) {
+    delete connection;
+    return true;
+}
+
+void Scanner::free_scanResults() {
+    std::lock_guard<std::mutex> scanResult_lock(list_mutex);
+    scanResults.remove_if(deleteAll);
 }

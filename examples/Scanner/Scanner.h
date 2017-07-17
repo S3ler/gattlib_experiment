@@ -6,6 +6,7 @@
 #define LINUX_MQTT_SN_GATEWAY_SCANNER_H
 
 #include "ScanResult.h"
+#include "ScannerCallbackInterface.h"
 
 #include <stdint.h>
 
@@ -22,6 +23,7 @@
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_lib.h>
+#include <thread>
 
 
 #define FLAGS_AD_TYPE               0x01
@@ -43,24 +45,35 @@ class Scanner {
 private:
     std::mutex signal_received_mutex;
     volatile int signal_received = 0;
-    std::atomic<bool> stopped;
+    volatile std::atomic<bool> stopped;
     std::list<ScanResult *> scanResults;
     std::mutex list_mutex;
+    ScannerCallbackInterface* callbackInterface = nullptr;
+    std::thread scan_thread;
 public:
+
     void scan(uint16_t duration);
+
+    void scan(ScannerCallbackInterface* callbackInterface);
 
     void stop();
 
+    void free_scanResults();
+
     std::list<ScanResult *> getScanResults();
+
+    bool isRunning();
 
     void setSignal(int sig);
 
     void removeScanResult(ScanResult *scanResult);
 
 private:
+    void scanWithCallback();
+
     void lescan(uint16_t duration);
 
-    int print_advertising_devices(int device_descriptor, uint8_t filter_type, int duration);
+    int print_advertising_devices(int device_descriptor, uint8_t filter_type, int duration, ScannerCallbackInterface* callbackInterface);
 
     int check_report_filter(uint8_t procedure, le_advertising_info *info);
 
