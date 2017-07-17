@@ -42,7 +42,9 @@ void Scanner::scan(uint16_t duration) {
 
 void Scanner::stop() {
     stopped = true;
-    scan_thread.join();
+    if (scan_thread.joinable()) {
+        scan_thread.join();
+    }
 }
 
 void Scanner::lescan(uint16_t duration) {
@@ -55,7 +57,14 @@ void Scanner::lescan(uint16_t duration) {
     uint16_t window = htobs(0x0010);
     uint8_t filter_dup = 0x01;
 
-    int dev_id = hci_get_route(NULL);
+    // FIXME: make MAC configureable
+    const char* MAC = "00:1A:7D:DA:71:20";
+    bdaddr_t bdaddr;
+    if(str2ba(MAC, &bdaddr) != 0){
+        perror("Converting MAC to bdaddr_t failed");
+        exit(1);
+    }
+    int dev_id = hci_get_route(&bdaddr);
     int device_descriptor = hci_open_dev(dev_id);
 
     if (device_descriptor < 0) {

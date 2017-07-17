@@ -13,7 +13,7 @@ bool Connector::onScanReceive(ScanResult *scanResult) {
 
     std::lock_guard<std::mutex> scanResult_lock_guard(scanResult_mutex);
     scanResults.push_back(scanResult);
-    return true;
+    return false;
 }
 
 void Connector::printDeviceAddress(device_address *address) {
@@ -90,7 +90,9 @@ const std::list<Connection *> &Connector::getActive_connections() const {
 
 void Connector::stop() {
     this->stopped = true;
-    this->connector_thread.join();
+    if (connector_thread.joinable()) {
+        this->connector_thread.join();
+    }
 }
 
 bool deleteAll(Connection *connection) {
