@@ -57,8 +57,7 @@ void Scanner::lescan(uint16_t duration) {
     uint16_t window = htobs(0x0010);
     uint8_t filter_dup = 0x01;
 
-    // FIXME: make MAC configureable
-    const char* MAC = "00:1A:7D:DA:71:20";
+
     bdaddr_t bdaddr;
     if(str2ba(MAC, &bdaddr) != 0){
         perror("Converting MAC to bdaddr_t failed");

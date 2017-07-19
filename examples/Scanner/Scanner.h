@@ -50,6 +50,10 @@ private:
     std::mutex list_mutex;
     ScannerCallbackInterface* callbackInterface = nullptr;
     std::thread scan_thread;
+
+    // FIXME: make MAC configureable
+    const char* MAC = "00:1A:7D:DA:71:20";
+
 public:
 
     void scan(uint16_t duration);

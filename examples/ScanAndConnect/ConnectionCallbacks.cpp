@@ -72,6 +72,9 @@ void connect_cb(GIOChannel *io, GError *err, gpointer user_data) {
 
     if (err) {
         connection->setState(STATE_ERROR);
+        if(err->code == 111){
+            connection->setErrorState(ConnectionRefused);
+        }
         printf("Command Failed: %s\n", err->message);
         return;
     }

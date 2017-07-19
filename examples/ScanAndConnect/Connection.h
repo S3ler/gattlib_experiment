@@ -42,6 +42,7 @@ extern "C" {
 enum ConnectionErrorStatus {
     MissingService,
     InternalBluetoothError,
+    ConnectionRefused,
     ConnectionDisconnected
 };
 
@@ -62,7 +63,7 @@ enum ConnectionState {
 class Connection {
 private:
     device_address address;
-    ConnectionErrorStatus errorStatus = ConnectionDisconnected;
+    volatile ConnectionErrorStatus errorStatus = ConnectionDisconnected;
     std::thread state_observer;
     std::thread g_lib_main_thread;
 
@@ -72,7 +73,9 @@ private:
 public:
     Connection(const ScanResult *scanResult);
 
-    ConnectionErrorStatus getErrorStatus();
+    void setErrorState(const volatile ConnectionErrorStatus state);
+
+    volatile ConnectionErrorStatus getErrorStatus();
 
     bool isDeviceAddress(const device_address *address);
 
@@ -94,7 +97,9 @@ public:
 
 public:
     char *opt_dst = NULL;
-    char *opt_src = NULL;
+    // FIXME: make MAC configureable
+    char* opt_src = "00:1A:7D:DA:71:21";
+    //char *opt_src = NULL;
     char *opt_dst_type = NULL;
     char *opt_sec_level = NULL;
     int opt_psm = 0;

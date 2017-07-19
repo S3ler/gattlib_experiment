@@ -9,8 +9,11 @@ Connection::Connection(const ScanResult *scanResult) {
     memcpy(this->address.bytes, scanResult->getDeviceAddress()->bytes, sizeof(device_address));
 }
 
+void Connection::setErrorState(const volatile ConnectionErrorStatus state) {
+    this->errorStatus = state;
+}
 
-ConnectionErrorStatus Connection::getErrorStatus() {
+volatile ConnectionErrorStatus Connection::getErrorStatus() {
     return errorStatus;
 }
 
@@ -62,7 +65,9 @@ bool Connection::connect() {
 void Connection::close() {
     if(g_main_loop_is_running(event_loop)){
         g_main_loop_quit(event_loop);
-        g_lib_main_thread.join();
+        if (g_lib_main_thread.joinable()) {
+            g_lib_main_thread.join();
+        }
     }
 
 
@@ -71,7 +76,8 @@ void Connection::close() {
     g_source_remove(prompt_signal);
     g_main_loop_unref(event_loop);
 
-    g_free(opt_src);
+    // opt_src is fixed coded, nothing to free
+    //g_free(opt_src);
     g_free(opt_dst);
     g_free(opt_sec_level);
 
@@ -116,11 +122,12 @@ void Connection::cmd_connect() {
 
     opt_dst_type = g_strdup("public");
 
+    // opt_src is the MAC of the local bluetooth adapter
+
     if (opt_dst == NULL) {
         printf("Command Failed: Remote Bluetooth address required\n");
         return;
     }
-
     printf("Attempting to connect to %s\n", opt_dst);
     iochannel = gatt_connect(opt_src, opt_dst, opt_dst_type, opt_sec_level,
                              opt_psm, opt_mtu, connect_cb, &gerr);
@@ -129,7 +136,7 @@ void Connection::cmd_connect() {
         printf("Command Failed: %s\n", gerr->message);
         g_error_free(gerr);
     } else{
-        g_io_add_watch(iochannel, G_IO_HUP, channel_watcher, NULL);
+        g_io_add_watch(iochannel, G_IO_HUP, channel_watcher, this);
         setState(STATE_PENDING_CHANGE);
     }
 }
@@ -291,7 +298,7 @@ void Connection::call_observe_state_loop() {
             cmd_set_nus_ready();
             return;
         }
-        // TODO imp
+        // TODO add timeout to calls
     }
 }
 
@@ -303,3 +310,4 @@ void Connection::setState(const volatile ConnectionState state) {
 volatile ConnectionState Connection::getState() const {
     return this->conn_state;
 }
+

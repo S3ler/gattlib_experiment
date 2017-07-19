@@ -13,7 +13,7 @@ bool Connector::onScanReceive(ScanResult *scanResult) {
 
     std::lock_guard<std::mutex> scanResult_lock_guard(scanResult_mutex);
     scanResults.push_back(scanResult);
-    return false;
+    return true;
 }
 
 void Connector::printDeviceAddress(device_address *address) {
@@ -60,11 +60,13 @@ void Connector::connect_loop() {
                         // failue == error => remove from blacklist (so it will be tried again)
                         scanResults.remove(scanResult);
                         scanner->removeScanResult(scanResult);
+                        connection->close();
                         delete (connection);
                         break;
-                    } else if (connection->getErrorStatus() == MissingService) {
+                    } else if (connection->getErrorStatus() == MissingService || connection->getErrorStatus() == ConnectionRefused) {
                         // if failure == no service => do not remove from blacklist
                         scanResults.remove(scanResult);
+                        connection->close();
                         delete (connection);
                         break;
                     }
