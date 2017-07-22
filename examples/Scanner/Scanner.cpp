@@ -59,7 +59,7 @@ void Scanner::lescan(uint16_t duration) {
 
 
     bdaddr_t bdaddr;
-    if(str2ba(MAC, &bdaddr) != 0){
+    if (str2ba(MAC, &bdaddr) != 0) {
         perror("Converting MAC to bdaddr_t failed");
         exit(1);
     }
@@ -358,4 +358,14 @@ bool deleteAll(ScanResult *connection) {
 void Scanner::free_scanResults() {
     std::lock_guard<std::mutex> scanResult_lock(list_mutex);
     scanResults.remove_if(deleteAll);
+}
+
+Scanner::Scanner(const char *scanner_mac) {
+    if (scanner_mac == nullptr) {
+        // TODO error
+    }
+    if (strlen(scanner_mac) != 17) {
+        // TODO error
+    }
+    strcpy(this->MAC, scanner_mac);
 }

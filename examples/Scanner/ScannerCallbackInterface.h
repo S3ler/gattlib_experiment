@@ -9,7 +9,7 @@
 
 class ScannerCallbackInterface {
 public:
-    virtual bool onScanReceive(ScanResult* scanResult)=0;
+    virtual bool onScanReceive(ScanResult *scanResult)=0;
 };
 
 #endif //GATTLIB_EXPERIMENTS_SCANNERCALLBACKINTERFACE_H

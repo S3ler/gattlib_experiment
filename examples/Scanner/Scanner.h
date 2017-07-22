@@ -48,17 +48,18 @@ private:
     volatile std::atomic<bool> stopped;
     std::list<ScanResult *> scanResults;
     std::mutex list_mutex;
-    ScannerCallbackInterface* callbackInterface = nullptr;
+    ScannerCallbackInterface *callbackInterface = nullptr;
     std::thread scan_thread;
 
-    // FIXME: make MAC configureable
-    const char* MAC = "00:1A:7D:DA:71:20";
+    char MAC[18] = {0};
 
 public:
 
+    Scanner(const char *scanner_mac);
+
     void scan(uint16_t duration);
 
-    void scan(ScannerCallbackInterface* callbackInterface);
+    void scan(ScannerCallbackInterface *callbackInterface);
 
     void stop();
 
@@ -77,7 +78,8 @@ private:
 
     void lescan(uint16_t duration);
 
-    int print_advertising_devices(int device_descriptor, uint8_t filter_type, int duration, ScannerCallbackInterface* callbackInterface);
+    int print_advertising_devices(int device_descriptor, uint8_t filter_type, int duration,
+                                  ScannerCallbackInterface *callbackInterface);
 
     int check_report_filter(uint8_t procedure, le_advertising_info *info);
 

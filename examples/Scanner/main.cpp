@@ -8,8 +8,10 @@
 #include "../FakeBluetoothLeSocket/DeviceAddress.h"
 #include <list>
 
+const char *MAC = "00:1A:7D:DA:71:20";
+
 int main(int argc, char *argv[]) {
-    Scanner scanner;
+    Scanner scanner(MAC);
     // scan 2 seconds
     scanner.scan(2);
     while (true) {

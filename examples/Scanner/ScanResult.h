@@ -13,7 +13,7 @@ class ScanResult {
 private:
     device_address address;
 public:
-    device_address* getDeviceAddress() const;
+    device_address *getDeviceAddress() const;
 
     ScanResult(const device_address *address);
 };
