@@ -5,8 +5,26 @@
 #include "Connection.h"
 #include "ConnectionCallbacks.h"
 
-Connection::Connection(const ScanResult *scanResult) {
-    memcpy(this->address.bytes, scanResult->getDeviceAddress()->bytes, sizeof(device_address));
+Connection::Connection(const device_address *address, const char *hci_mac) {
+    if (address == nullptr) {
+        // TODO error
+    }
+    if (hci_mac == nullptr) {
+        // TODO error
+    }
+    if (strlen(hci_mac) != 17) {
+        // TODO error
+    }
+
+    strcpy(this->opt_src, hci_mac);
+    memcpy(&this->address, address, sizeof(device_address));
+}
+
+void Connection::setReceiverInterface(ReceiverInterface *receiverInterface) {
+    if (receiverInterface == nullptr) {
+        // TODO error
+    }
+    this->receiverInterface = receiverInterface;
 }
 
 void Connection::setErrorState(const volatile ConnectionErrorStatus state) {
@@ -21,33 +39,35 @@ bool Connection::isDeviceAddress(const device_address *address) {
     return memcmp(this->address.bytes, address->bytes, sizeof(device_address)) == 0;
 }
 
-void Connection::onReceive(const uint8_t *data, uint16_t length) {
-    // TODO this is a placeholder function to print out the messages
-    // TODO later this will be the function in the LinuxBluetoothLowEnergySocket
-    for (int i = 0; i < length; i++) {
-        std::cout << std::hex << std::uppercase << (int) address.bytes[i]
-                  << std::nouppercase << std::dec
-                  << std::flush;
-        if (i != sizeof(device_address) - 1) {
-            std::cout << ":";
+void Connection::onReceive(const uint8_t *data, const uint16_t length) {
+    if (receiverInterface != nullptr) {
+        receiverInterface->onReceive(&this->address, data, length);
+    } else {
+        for (int i = 0; i < sizeof(device_address); i++) {
+            std::cout << std::hex << std::uppercase << (int) address.bytes[i]
+                      << std::nouppercase << std::dec
+                      << std::flush;
+            if (i != sizeof(device_address) - 1) {
+                std::cout << ":";
+            }
         }
+        std::cout << " - ";
+        for (int i = 0; i < length; i++) {
+            std::cout << (char) data[i] << std::flush;
+        }
+        std::cout << std::endl;
     }
-    std::cout << " - ";
-    for (int i = 0; i < length; i++) {
-        std::cout << (char) data[i] << std::flush;
-    }
-    std::cout << std::endl;
 }
 
 bool Connection::connect() {
 
     char peripheral_mac[50] = {0};
     bdaddr_t tmp_bdaddr;
-    memcpy(tmp_bdaddr.b,this->address.bytes,sizeof(bdaddr_t));
+    memcpy(tmp_bdaddr.b, this->address.bytes, sizeof(bdaddr_t));
     ba2str(&tmp_bdaddr, peripheral_mac);
 
     opt_sec_level = g_strdup("low");
-    opt_src = NULL;
+    // opt_src = NULL;
     opt_dst = g_strdup(peripheral_mac);
     opt_dst_type = g_strdup("public");
     opt_psm = 0;
@@ -63,7 +83,11 @@ bool Connection::connect() {
 }
 
 void Connection::close() {
-    if(g_main_loop_is_running(event_loop)){
+    // TODO maybe create a asynchronous close function
+    // TODO asyncClose - awaitClose
+    this->setState(STATE_CLOSED);
+
+    if (g_main_loop_is_running(event_loop)) {
         g_main_loop_quit(event_loop);
         if (g_lib_main_thread.joinable()) {
             g_lib_main_thread.join();
@@ -87,14 +111,14 @@ void Connection::close() {
 }
 
 bool Connection::send(uint8_t *data, uint16_t length) {
-    if(conn_state != STATE_NUS_READY){
+    if (conn_state != STATE_NUS_READY) {
         // TODO set error stuff
         return false;
     }
     return cmd_char_write_raw(length, data);
 }
 
-bool  Connection::cmd_char_write_raw(uint16_t length, uint8_t *data) {
+bool Connection::cmd_char_write_raw(uint16_t length, uint8_t *data) {
 
     if (length > 20) {
         // TODO this is too long, MQTT-SN standard says: discard but i dont like it.
@@ -108,8 +132,8 @@ bool  Connection::cmd_char_write_raw(uint16_t length, uint8_t *data) {
     }
 
     gint r = gatt_write_char(attrib, nus_tx_handle, data, (size_t) length,
-                    char_write_req_raw_cb, this);
-    return r>0;
+                             char_write_req_raw_cb, this);
+    return r > 0;
 }
 
 void Connection::cmd_connect() {
@@ -135,7 +159,7 @@ void Connection::cmd_connect() {
         setState(STATE_ERROR);
         printf("Command Failed: %s\n", gerr->message);
         g_error_free(gerr);
-    } else{
+    } else {
         g_io_add_watch(iochannel, G_IO_HUP, channel_watcher, this);
         setState(STATE_PENDING_CHANGE);
     }
@@ -158,11 +182,11 @@ Connection::gatt_connect(const char *src, const char *dst, const char *dst_type,
             hci_devba(atoi(src + 3), &sba);
         else
             str2ba(src, &sba);
-    } else{
+    } else {
         // BDADRR_ANY is exchanged
         //#define BDADDR_ANY   (&(bdaddr_t) {{0, 0, 0, 0, 0, 0}})
         bdaddr_t bdaddr_any;
-        memset(bdaddr_any.b,0,sizeof(bdaddr_any));
+        memset(bdaddr_any.b, 0, sizeof(bdaddr_any));
         bacpy(&sba, &bdaddr_any);
     }
 
@@ -206,7 +230,6 @@ Connection::gatt_connect(const char *src, const char *dst, const char *dst_type,
 
     return chan;
 }
-
 
 
 void Connection::disconnect_io() {
@@ -278,23 +301,23 @@ void Connection::call_g_main_loop_run() {
 }
 
 void Connection::call_observe_state_loop() {
-    while (true){
-        if(conn_state == STATE_CLOSED || conn_state == STATE_ERROR){
+    while (true) {
+        if (conn_state == STATE_CLOSED || conn_state == STATE_ERROR) {
             return;
         }
-        if(conn_state == STATE_PENDING_CHANGE){
+        if (conn_state == STATE_PENDING_CHANGE) {
             // nothing to do
             continue;
         }
-        if(conn_state == STATE_DISCONNECTED){
+        if (conn_state == STATE_DISCONNECTED) {
             cmd_connect();
-        } else if( conn_state == STATE_CONNECTED){
+        } else if (conn_state == STATE_CONNECTED) {
             cmd_check_characteristic_descriptors();
-        } else if(conn_state == STATE_HANDLE_READY){
+        } else if (conn_state == STATE_HANDLE_READY) {
             cmd_read_tx_buffer();
-        } else if(conn_state == STATE_TX_VALUE_SAVED){
+        } else if (conn_state == STATE_TX_VALUE_SAVED) {
             cmd_write_tx_notify_hnd();
-        }else if(conn_state == STATE_RX_NOTIFY_ENABLED){
+        } else if (conn_state == STATE_RX_NOTIFY_ENABLED) {
             cmd_set_nus_ready();
             return;
         }
@@ -311,3 +334,6 @@ volatile ConnectionState Connection::getState() const {
     return this->conn_state;
 }
 
+const device_address *Connection::getAddress() const {
+    return &address;
+}

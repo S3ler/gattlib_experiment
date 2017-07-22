@@ -11,6 +11,7 @@
 
 
 #include "../Scanner/ScanResult.h"
+#include "ReceiveInterface.h"
 #include <stdint.h>
 #include <iostream>
 
@@ -71,7 +72,9 @@ private:
     volatile ConnectionState conn_state = STATE_DISCONNECTED;
 
 public:
-    Connection(const ScanResult *scanResult);
+    Connection(const device_address *address, const char *hci_mac);
+
+    void setReceiverInterface(ReceiverInterface *receiverInterface);
 
     void setErrorState(const volatile ConnectionErrorStatus state);
 
@@ -85,7 +88,7 @@ public:
 
     bool send(uint8_t *data, uint16_t length);
 
-    void onReceive(const uint8_t *data, uint16_t length);
+    void onReceive(const uint8_t *data, const uint16_t length);
 
     void call_g_main_loop_run();
 
@@ -95,10 +98,12 @@ public:
 
     volatile ConnectionState getState() const;
 
+    ReceiverInterface *receiverInterface = nullptr;
+
 public:
     char *opt_dst = NULL;
     // FIXME: make MAC configureable
-    char* opt_src = "00:1A:7D:DA:71:21";
+    char opt_src[18] = {0};
     //char *opt_src = NULL;
     char *opt_dst_type = NULL;
     char *opt_sec_level = NULL;
@@ -122,7 +127,7 @@ public:
 
     void cmd_connect();
 
-     GIOChannel *gatt_connect(const char *src, const char *dst,
+    GIOChannel *gatt_connect(const char *src, const char *dst,
                              const char *dst_type, const char *sec_level,
                              int psm, int mtu, BtIOConnect connect_cb,
                              GError **gerr);
@@ -138,6 +143,9 @@ public:
     void cmd_set_nus_ready();
 
     bool cmd_char_write_raw(uint16_t length, uint8_t *data);
+
+    const device_address *getAddress() const;
+
 
 };
 

@@ -21,16 +21,27 @@ list(GET BLUEZ_VERSIONS 0 BLUEZ_VERSION_MAJOR)
 list(GET BLUEZ_VERSIONS 1 BLUEZ_VERSION_MINOR)
 add_definitions(-DBLUEZ_VERSION_MAJOR=${BLUEZ_VERSION_MAJOR} -DBLUEZ_VERSION_MINOR=${BLUEZ_VERSION_MINOR})
 
-if(BLUEZ_VERSION_MAJOR STREQUAL "4")
+if (BLUEZ_VERSION_MAJOR STREQUAL "4")
     set(bluez4_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../bluez/bluez4)
     include_directories(${bluez4_DIR}/attrib ${bluez4_DIR}/btio ${bluez4_DIR}/src ${bluez4_DIR}/lib)
-else()
+else ()
     set(bluez5_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../bluez/bluez5)
     include_directories(${bluez5_DIR} ${bluez5_DIR}/attrib ${bluez5_DIR}/btio ${bluez5_DIR}/lib)
-endif()
+endif ()
 
-set(SOURCE_FILES Connection.cpp Connection.h)
-set(MAIN_FILE main.cpp ConnectionCallbacks.cpp ConnectionCallbacks.h Connector.cpp Connector.h)
+set(SOURCE_FILES
+        Connection.h
+        Connection.cpp
+        ConnectionCallbacks.h
+        ConnectionCallbacks.cpp
+        ReceiveInterface.h
+        Connector.h
+        Connector.cpp)
+
+set(MAIN_FILE main.cpp)
 
 add_executable(BLEScanAndConnect ${SOURCE_FILES} ${MAIN_FILE})
-target_link_libraries(BLEScanAndConnect ${GATTLIB_LIBRARIES} ${GLIB_LIBRARIES} libBLEScanner pthread bluetooth )
+target_link_libraries(BLEScanAndConnect ${GATTLIB_LIBRARIES} ${GLIB_LIBRARIES} libBLEScanner pthread bluetooth)
+
+add_library(libBLEConnection ${SOURCE_FILES})
+target_link_libraries(libBLEConnection ${GATTLIB_LIBRARIES} ${GLIB_LIBRARIES} libBLEScanner pthread bluetooth)

@@ -9,7 +9,7 @@ extern "C" {
 
 void events_handler(const uint8_t *pdu, uint16_t len, gpointer user_data) {
     Connection *connection = reinterpret_cast<Connection *>(user_data);
-    if(connection == NULL){
+    if (connection == NULL) {
         g_printerr("Connection is NULL in  events_handler");
         // TODO handle error
     }
@@ -30,7 +30,7 @@ void events_handler(const uint8_t *pdu, uint16_t len, gpointer user_data) {
                 printf("nus_rx_notify_handle");
             } else if (handle == connection->nus_rx_handle) {
                 printf("nus_rx_handle");
-                connection->onReceive(pdu,len);
+                connection->onReceive(pdu, len);
             }
             // HERE: notify handle
             break;
@@ -59,7 +59,7 @@ void events_handler(const uint8_t *pdu, uint16_t len, gpointer user_data) {
 void connect_cb(GIOChannel *io, GError *err, gpointer user_data) {
     Connection *connection = reinterpret_cast<Connection *>(user_data);
 
-    if(connection == NULL){
+    if (connection == NULL) {
         g_printerr("Connection is NULL in connect_cb");
         // TODO handle error
         // this should never happen!
@@ -72,7 +72,7 @@ void connect_cb(GIOChannel *io, GError *err, gpointer user_data) {
 
     if (err) {
         connection->setState(STATE_ERROR);
-        if(err->code == 111){
+        if (err->code == 111) {
             connection->setErrorState(ConnectionRefused);
         }
         printf("Command Failed: %s\n", err->message);
@@ -106,7 +106,7 @@ void connect_cb(GIOChannel *io, GError *err, gpointer user_data) {
 gboolean channel_watcher(GIOChannel *chan, GIOCondition cond,
                          gpointer user_data) {
     Connection *connection = reinterpret_cast<Connection *>(user_data);
-    if(connection == NULL){
+    if (connection == NULL) {
         g_printerr("Connection is NULL in channel_watcher");
         // TODO handle error
     }
@@ -117,7 +117,7 @@ gboolean channel_watcher(GIOChannel *chan, GIOCondition cond,
 
 void check_characteristic_descriptors(uint8_t status, GSList *descriptors, gpointer user_data) {
     Connection *connection = reinterpret_cast<Connection *>(user_data);
-    if(connection == NULL){
+    if (connection == NULL) {
         g_printerr("Connection is NULL in check_characteristic_descriptors");
         // TODO handle error
     }
@@ -195,7 +195,7 @@ void check_characteristic_descriptors(uint8_t status, GSList *descriptors, gpoin
 void cmd_read_tx_buffer_cb(guint8 status, const guint8 *pdu, guint16 plen,
                            gpointer user_data) {
     Connection *connection = reinterpret_cast<Connection *>(user_data);
-    if(connection == NULL){
+    if (connection == NULL) {
         g_printerr("Connection is NULL in cmd_read_tx_buffer_cb");
         // TODO handle error
     }
@@ -253,7 +253,7 @@ void cmd_read_tx_buffer_cb(guint8 status, const guint8 *pdu, guint16 plen,
 void char_write_req_raw_cb(guint8 status, const guint8 *pdu, guint16 plen,
                            gpointer user_data) {
     Connection *connection = reinterpret_cast<Connection *>(user_data);
-    if(connection == NULL){
+    if (connection == NULL) {
         g_printerr("Connection is NULL in char_write_req_raw_cb");
         // TODO handle error
     }
@@ -262,11 +262,13 @@ void char_write_req_raw_cb(guint8 status, const guint8 *pdu, guint16 plen,
     if (status != 0) {
         printf("Command Failed: Characteristic Write Request failed: "
                        "%s\n", att_ecode2str(status));
+        connection->setState(STATE_ERROR);
         return;
     }
 
     if (!dec_write_resp(pdu, plen) && !dec_exec_write_resp(pdu, plen)) {
         printf("Command Failed: Protocol error\n");
+        connection->setState(STATE_ERROR);
         return;
     }
 

@@ -6,40 +6,15 @@
 #include "Connection.h"
 #include "Connector.h"
 
-int main(int argc, char *argv[]) {
-    Scanner scanner;
-    Connector connector;
+const char *scanner_mac = "00:1A:7D:DA:71:20";
+const char *connector_mac = "00:1A:7D:DA:71:21";
 
-    connector.setScanner(&scanner);
+int main(int argc, char *argv[]) {
+    Scanner scanner(scanner_mac);
+    Connector connector(connector_mac, &scanner);
+
     connector.start();
     scanner.scan(&connector);
-
-    // while(scanner.isRunning()){
-        //connectToAllScanResults();
-    // }
-    /*
-    while (true) {
-
-        std::list<ScanResult *> scanResults = scanner.getScanResults();
-        for (auto &&scanResult : scanResults) {
-            printDeviceAddress(scanResult->getDeviceAddress());
-        }
-
-        std::string input;
-        getline(std::cin, input);
-        if (input.compare("again") == 0) {
-            // scan for 10 seconds
-            scanner.scan(5);
-        }
-        if (input.compare("ok") == 0) {
-            break;
-        }
-        if (input.compare("exit") == 0) {
-            goto done;
-        }
-    }
-    */
-
 
     while (true) {
         std::string input;
@@ -48,54 +23,34 @@ int main(int argc, char *argv[]) {
         if (input.compare("exit") == 0) {
             goto done;
         }
-        if (str2ba(input.c_str(), &bdaddr) == -1) {
-            std::cout << "invalid MAC - usage: BLE MAC Adresse in Form 00:1A:7D:DA:71:11" << std::endl;
-            continue;
-        }
-        device_address addr;
-        memset(addr.bytes, 0x0, sizeof(device_address));
-        memcpy(addr.bytes, bdaddr.b, sizeof(bdaddr_t));
-        bool connection_found = false;
-        std::list<Connection*> active_connections = connector.getActive_connections();
-        if(active_connections.size() == 0){
-            std::cout << "No Active Connections - exiting" << std::endl;
-            goto done;
-        }
-        for (std::list<Connection *>::const_iterator iterator = active_connections.begin(),
-                     end = active_connections.end();
-             iterator != end; ++iterator) {
-            Connection* connection = *iterator;
-            if (connection->isDeviceAddress(&addr)) {
-                connection_found = true;
+        if (str2ba(input.c_str(), &bdaddr) == 0) {
+            device_address addr;
+            memset(addr.bytes, 0x0, sizeof(device_address));
+            memcpy(addr.bytes, bdaddr.b, sizeof(bdaddr_t));
+            if (connector.isConnected(&addr)) {
                 std::cout << "Connection found - input message now" << std::endl;
                 std::string message;
                 getline(std::cin, message);
                 if (message.compare("exit") == 0) {
                     goto done;
                 }
-                if(message.compare("close")==0){
-                    std::cout << "closing connection" << std::endl;
-                    active_connections.erase(iterator);
-                    connection->close();
-                    delete (connection);
-                    break;
+                if (message.compare("close") == 0) {
+                    connector.close(&addr);
                 }
-                if (connection->send((uint8_t *) message.c_str(), (uint16_t) message.length())) {
+                if (connector.send(&addr, (uint8_t *) message.c_str(), (uint16_t) message.length())) {
                     std::cout << "Send - success" << std::endl;
                 } else {
                     std::cout << "Send - failure" << std::endl;
-                    active_connections.erase(iterator);
-                    connection->close();
-                    delete (connection);
+                    connector.close(&addr);
                 }
-                break;
+            } else {
+                std::cout << "No Connection found" << std::endl;
             }
-        }
-        if (!connection_found) {
-            std::cout << "No Connection found" << std::endl;
+        } else {
+            std::cout << "invalid MAC - usage: BLE MAC Adresse in Form 00:1A:7D:DA:71:11" << std::endl;
+            continue;
         }
     }
-
 
     done:
     connector.stop();
