@@ -233,5 +233,12 @@ void Connector::onReceive(const device_address *address, const uint8_t *payload,
     }
 }
 
+void Connector::setReceiverInterface(ReceiverInterface *receiverInterface) {
+    if(receiverInterface == nullptr){
+        // TODO error
+    }
+    this->receiverInterface = receiverInterface;
+}
+
 
 

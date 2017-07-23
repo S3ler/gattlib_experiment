@@ -39,6 +39,8 @@ public:
 
     Connector(const char *connector_mac, Scanner *scanner);
 
+    void setReceiverInterface(ReceiverInterface *receiverInterface);
+
     void start();
 
     void stop();

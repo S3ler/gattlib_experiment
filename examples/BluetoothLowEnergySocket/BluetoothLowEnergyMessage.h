@@ -6,18 +6,23 @@
 #define LINUX_MQTT_SN_GATEWAY_BLUETOOTHLOWENERGYMESSAGE_H
 
 
-#include <global_defines.h>
+#include "../Scanner/DeviceAddress.h"
 
 class BluetoothLowEnergyMessage {
-public:
-    BluetoothLowEnergyMessage();
 
+private:
     device_address address;
     uint8_t payload[255];
     uint16_t payload_length;
 
-    void setDeviceAddress(const device_address* address);
-    void setPayload(const uint8_t* payload, const uint16_t payload_length);
+public:
+    BluetoothLowEnergyMessage(const device_address* address, const uint8_t* payload, const uint16_t payload_length);
+
+    const device_address &getAddress() const;
+
+    const uint8_t *getPayload() const;
+
+    uint16_t getPayload_length() const;
 };
 
 
