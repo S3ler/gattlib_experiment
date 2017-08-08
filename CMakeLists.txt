@@ -80,6 +80,7 @@ add_subdirectory(examples/BluetoothLowEnergySocket)
 add_subdirectory(examples/ScanAndConnect)
 #add_subdirectory(examples/FakeBluetoothLeSocket)
 #add_subdirectory(examples/CentralNordicUartService)
+add_subdirectory(examples/AdafruitNordicUartService)
 add_subdirectory(examples/PeripheralNordicUartService)
 
 # Some examples require Bluez code and other DBus support
