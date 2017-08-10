@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
     PyRun_SimpleString("import sys");
     //PyRun_SimpleString(syspathappend);
     PyRun_SimpleString(
-            "sys.path.append(\"/home/bele/mqttsngit/mqtt-sn-gateway/gattlib_experiments/examples/PeripheralNordicUartService\")");
+            "sys.path.append(\"/home/bele/mqttsngit/mqtt-sn-gateway/gattlib_experiments/examples/AdafruitNordicUartService\")");
 
 
     pName = PyString_FromString("py_nusperipheral");
