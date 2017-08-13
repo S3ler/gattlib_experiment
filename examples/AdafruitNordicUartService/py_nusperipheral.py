@@ -128,9 +128,9 @@ class Advertisement(dbus.service.Object):
 class NUSAdvertisment(Advertisement):
     def __init__(self, bus, index):
         Advertisement.__init__(self, bus, index, 'peripheral')
-        self.add_service_uuid(BATTERY_SERVICE_UUID)
-        self.add_manufacturer_data(0xffff, [0x00, 0x01, 0x02, 0x03, 0x04])
-        self.add_service_data('9999', [0x00, 0x01, 0x02, 0x03, 0x04])
+        #self.add_service_uuid(BATTERY_SERVICE_UUID)
+        #self.add_manufacturer_data(0xffff, [0x00, 0x01, 0x02, 0x03, 0x04])
+        #self.add_service_data('9999', [0x00, 0x01, 0x02, 0x03, 0x04])
         self.include_tx_power = True
 
 
@@ -330,7 +330,7 @@ class NUSService(Service):
     TEST_SVC_UUID = '6E400001-B5A3-F393-E0A9-E50E24DCCA9E'
 
     def __init__(self, bus, index):
-        Service.__init__(self, bus, index, self.TEST_SVC_UUID, False)
+        Service.__init__(self, bus, index, self.TEST_SVC_UUID, True)
         self.add_characteristic(RXCharacteristic(bus, 0, self))
         self.tx_characteristc = TXCharacteristic(bus, 1, self)
         self.add_characteristic(self.tx_characteristc)
